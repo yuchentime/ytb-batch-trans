@@ -938,6 +938,7 @@ async fn transcribe_segments(
         );
         duration
       }
+      Err(FfmpegError::Cancelled) => return Err(JobError::Cancelled),
       Err(FfmpegError::SpawnFailed(error)) => {
         tracing::error!(
           event = events::DURATION_UNKNOWN,
@@ -1002,6 +1003,9 @@ async fn transcribe_segments(
     )
     .await
     {
+      if matches!(error, FfmpegError::Cancelled) {
+        return Err(JobError::Cancelled);
+      }
       let (code, message) = ffmpeg_failure(&error);
       tracing::error!(
         event = events::CHUNK_CUT_FAIL,

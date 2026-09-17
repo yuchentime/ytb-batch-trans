@@ -301,9 +301,9 @@ pub struct ProcessResult {
 /// Runs `command` to completion while streaming lines to the callbacks (stdout is also
 /// collected in full; stderr keeps only the last 64 lines).
 ///
-/// `cancel` is the group-state watch channel: a `true` value kills the process tree and
-/// returns a cancelled result (AC-16). Callers must also check the initial value before
-/// calling, because a value that was already `true` never produces a change.
+/// `cancel` is the group-state watch channel: `true` means the group is running, `false`
+/// means it was cancelled (AC-16). A change to `false` (or an already-`false` value,
+/// which never produces a change) kills the process tree and reports `cancelled`.
 pub async fn run_streaming<F, G>(
   command: Command,
   mut cancel: watch::Receiver<bool>,
@@ -316,7 +316,7 @@ where
 {
   const STDERR_TAIL_LINES: usize = 64;
 
-  if *cancel.borrow() {
+  if !*cancel.borrow() {
     return Ok(ProcessResult {
       cancelled: true,
       ..ProcessResult::default()
@@ -332,12 +332,17 @@ where
       tokio::select! {
         event = rx.recv() => event,
         changed = cancel.changed() => {
-          if changed.is_ok() {
+          if changed.is_err() {
+            // The group sender was dropped (cleanup); keep draining the process.
+            watch_cancel = false;
+            continue;
+          }
+          if !*cancel.borrow() {
             let _ = process.kill_tree();
             result.cancelled = true;
             break;
           }
-          watch_cancel = false;
+          // A redundant `true` notification: keep watching.
           continue;
         }
       }
@@ -376,4 +381,81 @@ where
 pub fn tail_excerpt(lines: &[String], count: usize) -> String {
   let start = lines.len().saturating_sub(count);
   lines[start..].join(" | ")
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::process::Command;
+  use std::time::Duration;
+  use tokio::sync::watch;
+
+  fn echo_command() -> Command {
+    #[cfg(windows)]
+    {
+      let mut command = Command::new("cmd");
+      command.args(["/c", "echo", "run-streaming-ok"]);
+      command
+    }
+    #[cfg(not(windows))]
+    {
+      let mut command = Command::new("sh");
+      command.args(["-c", "echo run-streaming-ok"]);
+      command
+    }
+  }
+
+  fn sleep_command() -> Command {
+    #[cfg(windows)]
+    {
+      let mut command = Command::new("cmd");
+      command.args(["/c", "ping", "-n", "10", "127.0.0.1"]);
+      command
+    }
+    #[cfg(not(windows))]
+    {
+      let mut command = Command::new("sh");
+      command.args(["-c", "sleep 10"]);
+      command
+    }
+  }
+
+  #[tokio::test]
+  async fn an_already_cancelled_group_never_spawns_the_command() {
+    let (_tx, rx) = watch::channel(false);
+
+    let result = run_streaming(echo_command(), rx, |_| {}, |_| {})
+      .await
+      .expect("run");
+
+    assert!(result.cancelled);
+    assert_eq!(result.code, None);
+    assert!(result.stdout.is_empty());
+  }
+
+  #[tokio::test]
+  async fn a_running_group_runs_the_command_to_completion() {
+    let (_tx, rx) = watch::channel(true);
+
+    let result = run_streaming(echo_command(), rx, |_| {}, |_| {})
+      .await
+      .expect("run");
+
+    assert!(!result.cancelled);
+    assert_eq!(result.code, Some(0));
+    assert!(result.stdout.contains("run-streaming-ok"));
+  }
+
+  #[tokio::test]
+  async fn flipping_the_group_to_false_kills_the_process() {
+    let (tx, rx) = watch::channel(true);
+    let handle =
+      tokio::spawn(async move { run_streaming(sleep_command(), rx, |_| {}, |_| {}).await });
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    tx.send(false).expect("the receiver is alive");
+
+    let result = handle.await.expect("join").expect("run");
+    assert!(result.cancelled);
+  }
 }
