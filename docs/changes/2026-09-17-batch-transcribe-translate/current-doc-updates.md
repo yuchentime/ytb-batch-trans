@@ -80,3 +80,16 @@ python docs/scripts/reconcile_docs.py docs        # 悬空引用应为 0（删�
 - [ ] `docs/manifest.yaml` 的 `code_globs` 不再引用已删除文件
 - [ ] 被取代的文档已归档并标 `superseded_by`
 - [ ] `design.md` 置 `status: implemented` + `landed_in`
+
+## 2026-09-18 同步进度（本次提交）
+
+已完成：
+
+- **A 全部**：新建 `docs/current/domains/transcribe-translate/`（index / flow / api-contract / data-model / backend-behavior / frontend-behavior / error-handling / verification）。
+- B：`media-queue/index.md` 与 `download-engine/index.md` 加「2026-09-18 状态」说明（下载 UI 已移除、下载向描述转为历史）；`settings-preferences/data-model.md` 标注当前 Config 形态与历史字段；`auth-secrets/api-contract.md` 新增 `ai.apiKey` 行；`platform/observability.md` 新增「文件日志」段；`platform/storage.md` 新增「转录输出目录」段。
+- C：`product/overview.md` 改写定位与用户任务/边界。
+- D：`docs/index.md` 领域表与定位；`docs/manifest.yaml` 新增 `transcribe-translate` 路由（required 8 篇 + observability，含 code_globs）。
+
+仍未完成（下一批）：B 的 download-engine 各细分文档（api-contract/backend-behavior/progress-and-diagnostics/verification）与 media-queue 细分文档的收缩、toolchain / app-lifecycle / shared（data-ownership、ipc-conventions、naming）、build-test-lint 的 L2/L3 入口；C 的 glossary / user-journeys(J9) / acceptance(A26+) / rules（architecture、forbidden、security）；D 的 evals 三份清单、archive 决策、`docs/source/batch-transcribe-translate/` 状态、`design.md` 置 `implemented` + `landed_in`。
+
+`reconcile_docs.py` 仍会报 media-queue/download-engine/settings-preferences/auth-secrets/app-lifecycle/frontend-runtime/build-test-lint/debugging 的 `code-newer-than-doc` —— 因为上面未完成的细分文档 `last_verified` 仍是 2026-09-17；完成后再逐领域复核并刷新。

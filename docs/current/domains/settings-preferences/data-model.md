@@ -7,7 +7,7 @@ canonical_for:
 related:
   - docs/current/domains/download-engine/api-contract.md
   - docs/current/domains/settings-preferences/api-contract.md
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # settings-preferences 数据模型
@@ -21,6 +21,8 @@ Rust 定义：`src-tauri/src/state/config_models.rs`、`preferences_models.rs`�
 
 ### Config（`config.store.json` → 键 `config`）
 
+> **2026-09-18 起**：应用只做「转录 + 翻译」。`Config` 当前形态为 `appearance`/`auth`/`network`/`input`/`performance`/`transcription`/`translation`/`logging`/`output`/`update`/`system`/`notifications`；`output` 的下载向字段与 `subtitles`/`sponsorBlock`/`inputFilters`/`input.preferVideoInMixedLinks` 已删除（旧文件中的未知键被忽略）。当前字段的权威说明见 `docs/current/domains/transcribe-translate/data-model.md`；本文件下方的下载向小节为历史记录，待归档。
+
 服务端默认值见 Rust `Default` 实现；前端 `defaultSettings` 是 UI 侧镜像（`maxConcurrency` 前端为 `1`，后端为 CPU 核数一半向上取整——以**后端为准**，前端只用于首屏渲染）。
 
 #### appearance
@@ -29,7 +31,7 @@ Rust 定义：`src-tauri/src/state/config_models.rs`、`preferences_models.rs`�
 | --- | --- | --- | --- | --- |
 | `theme` | `string` | `"system"` | `system` / `light` / `dark` | `useTheme`（`data-theme` 属性） |
 | `language` | `string` | `"system"` | `system` 或 locale 代码 | vue-i18n、Rust `I18nManager`、托盘/通知 |
-| `expandedOptions` | `string` | `"none"` | `none` / `encodings` / `tracks` | `MediaConfigureStep` 展开区 |
+| `expandedOptions` | `string` | `"none"` | `none` / `encodings` / `tracks` | 历史字段（configure 步骤已移除，保留以兼容旧配置） |
 
 #### auth（Cookie 部分；密码类见 auth-secrets）
 
@@ -166,7 +168,7 @@ Rust 定义：`src-tauri/src/state/config_models.rs`、`preferences_models.rs`�
 | `prevX` / `prevY` | `number` | `0` | 最大化前的位置（恢复最大化时使用） |
 | `maximized` | `boolean` | `false` | 是否最大化 |
 
-### 覆盖优先级（下载相关）
+### 覆盖优先级（历史：下载相关，转录流程不适用）
 
 ```text
 组级 DownloadOverrides  >  Preferences.paths（仅目录/目录模板）  >  Config  >  yt-dlp 默认

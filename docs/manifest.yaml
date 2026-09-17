@@ -1,5 +1,5 @@
 version: 1
-updated_at: "2026-09-17"
+updated_at: "2026-09-18"
 runtime_policy:
   default_order:
     - "docs/index.md"
@@ -32,6 +32,38 @@ routes:
       - docs/current/product/glossary.md
       - docs/current/product/user-journeys.md
       - docs/current/product/acceptance.md
+
+  transcribe-translate:
+    description: "批量转录 + AI 中文翻译：环境门禁、音频获取、分块转录、翻译与保真、产物与续跑、文件日志"
+    token_budget: 30000
+    code_globs:
+      - src-tauri/src/commands/transcription/**
+      - src-tauri/src/scheduling/transcribe_pipeline.rs
+      - src-tauri/src/transcribe/**
+      - src-tauri/src/translation/**
+      - src-tauri/src/runners/whisper_runner.rs
+      - src-tauri/src/runners/ffmpeg_runner.rs
+      - src-tauri/src/stronghold/**
+      - src/stores/transcription.ts
+      - src/stores/stronghold.ts
+      - src/tauri/listeners/transcription.ts
+      - src/tauri/types/transcription.ts
+      - src/components/settings/SettingsTranscription.vue
+      - src/components/settings/SettingsTranslation.vue
+      - src/components/settings/SettingsOutput.vue
+      - src/components/media-card/steps/**
+      - src/components/media-view/TheTranscript.vue
+      - src/views/app/SetupView.vue
+    required:
+      - docs/current/domains/transcribe-translate/index.md
+      - docs/current/domains/transcribe-translate/flow.md
+      - docs/current/domains/transcribe-translate/api-contract.md
+      - docs/current/domains/transcribe-translate/data-model.md
+      - docs/current/domains/transcribe-translate/backend-behavior.md
+      - docs/current/domains/transcribe-translate/frontend-behavior.md
+      - docs/current/domains/transcribe-translate/error-handling.md
+      - docs/current/domains/transcribe-translate/verification.md
+      - docs/current/platform/observability.md
 
   media-queue:
     description: "入队、元数据抓取、播放列表处理、队列卡片状态机、下载触发与队列操作"

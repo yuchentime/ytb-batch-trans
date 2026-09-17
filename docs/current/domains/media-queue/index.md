@@ -7,7 +7,7 @@ canonical_for:
 related:
   - docs/current/domains/media-queue/flow.md
   - docs/current/domains/download-engine/index.md
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # media-queue 文档路由
@@ -24,6 +24,8 @@ last_verified: 2026-09-17
 - `verification.md`：本领域的验证方式与回归清单。
 
 ## 范围
+
+> **2026-09-18 状态**：产品主线已改为「转录 + 翻译」（`docs/current/domains/transcribe-translate/`）。入队、卡片状态机与分组模型仍被复用，但「配置/下载触发、播放列表选择、体积查询」不再是产品行为；下载向的详细描述（`flow.md`/`frontend-behavior.md` 等）保留为历史，待归档。
 
 责任单元：**用户的一次入队从 URL 变成可下载的队列条目，直到把条目交给下载引擎**。
 包含入队渠道、元数据抓取、播放列表拆分/合并与条目选择、队列卡片状态机、队列级操作（下载/暂停/恢复/重试/删除/清空）、

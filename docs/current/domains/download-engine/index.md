@@ -7,7 +7,7 @@ canonical_for:
 related:
   - docs/current/domains/media-queue/flow.md
   - docs/current/platform/observability.md
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # download-engine 文档路由
@@ -21,6 +21,8 @@ last_verified: 2026-09-17
 - `verification.md`：验证方式与回归清单。
 
 ## 范围
+
+> **2026-09-18 状态**：应用不再向用户提供文件下载；yt-dlp/ffmpeg 仅服务于转录链路（音频获取、时长探测、切块）。本领域文档中「字幕 / SponsorBlock / 后处理 / 格式矩阵」等段落为历史，待归档；当前参数与错误契约见 `docs/current/domains/transcribe-translate/`。
 
 责任单元：**把一条下载任务翻译成 yt-dlp 调用、执行、并把执行结果转成前端可消费的事件**。
 包含参数构造（format/output/location/network/auth/subtitle/sponsorblock/input-filters）、进程启动与终止、

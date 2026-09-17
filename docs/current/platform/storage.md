@@ -7,7 +7,7 @@ canonical_for:
 related:
   - docs/current/shared/data-ownership.md
   - docs/current/platform/env.md
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # 存储与环境形态
@@ -81,6 +81,15 @@ last_verified: 2026-09-17
 
 需要备份的是：`config.store.json`、`preferences.store.json`、`vault.hold`（+ 系统钥匙串中的主密钥）。
 `bin/` 与 WebView 数据可重新生成，不必备份。
+
+### 转录输出目录（`output.rootDir`，默认 `<系统下载目录>/ovd-transcripts`）
+
+| 路径 | 内容 | 生命周期 |
+| --- | --- | --- |
+| `<root>/<消毒后的标题>/transcript.en.txt`、`transcript.zh.txt` | 交付物（UTF-8 无 BOM + LF） | 永久；`overwrite=false` 时存在即跳过 |
+| `<root>/<消毒后的标题>/.work/` | 中间产物：`audio.<ext>`、`chunks/`、`segments.json`、`zh.blocks.json`、`source.json` | 成功写双 txt 后删除音频（`keepAudio=true` 保留）；失败/取消保留现场 |
+| `<root>/summary.md` | 批次汇总（表格 + Totals） | 每次批次结束时覆盖写 |
+| `<app_dir>/logs/transcribe.log`(+`.1`…`.4`) | 文件日志（5MB × 5） | 轮转自管理，见 `observability.md` |
 
 ## Boundaries
 

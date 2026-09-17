@@ -7,7 +7,7 @@ canonical_for:
 related:
   - docs/current/domains/download-engine/progress-and-diagnostics.md
   - docs/current/rules/security.rules.md
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # 可观测性
@@ -69,6 +69,20 @@ last_verified: 2026-09-17
 | 原始 yt-dlp 输出 | 媒体详情页 Logs 标签（用户可复制） |
 | 诊断码 | 卡片上的本地化消息（code 对应 `errors.runner.<code>`） |
 | 崩溃堆栈 | Sentry（若用户开启上报） |
+
+### 文件日志（`<app_dir>/logs/transcribe.log`）
+
+长链路（fetch → 音频 → 分块 → 转录 → 合并 → 翻译 → 写盘 → 清理）的即时排查通道：
+
+| 维度 | 事实 |
+| --- | --- |
+| 路径 / 轮转 | `<app_dir>/logs/transcribe.log`，单文件 5MB × 5（`.1`…`.4`，总量 ≤25MB），追加写、每行落盘，可直接 `tail -f` |
+| 单行格式 | `<ISO8601 本地时间> \| <LEVEL> \| <event> \| run=<id> group=<id> stage=<stage> <k=v…>` |
+| 事件码 | design 第 8 节表（`run.start`/`stage.change`/`audio.download.*`/`chunk.*`/`whisper.*`/`merge.*`/`transcript.*.ok`/`translate.block.*`/`tool.output` 等），实现与测试逐字一致 |
+| `logging.verbose` | 默认 `false`；`true` 时额外写入 yt-dlp/whisper/ffmpeg 逐行原始输出（`tool.output`，Sentry 层按 target 排除） |
+| 脱敏 | 密钥/Cookie/Bearer/请求头值永不写入；敏感字段名黑名单集中实现（值替换 `[redacted]`）；失败响应片段截断 ≤500 字符，标题 ≤80；完整 URL 按已确认决策记录（仅本机，不外传） |
+| 降级 | 目录不可写/写入失败 → 只告警一次 `log.write_failed`（WARN），不阻断流水线 |
+| 可达性 | `transcription_probe` 返回 `logDir`/`logFile`/`logSizeBytes`；详情页日志 tab 与设置→关于可「打开日志文件」；前端不读取日志内容 |
 
 ## Boundaries
 

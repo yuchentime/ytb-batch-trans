@@ -7,7 +7,7 @@ canonical_for:
 related:
   - docs/current/shared/ipc-conventions.md
   - docs/current/domains/auth-secrets/flow.md
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # auth-secrets 接口契约
@@ -33,6 +33,7 @@ last_verified: 2026-09-17
 | `videoPassword` | `video.password` | 视频密码 | `--video-password <v>` |
 | `bearer` | `auth.bearer` | Bearer Token | `--add-header Authorization:Bearer <v>` |
 | `headers` | `auth.headers` | 多行请求头文本 | 每个合法行一个 `--add-header <line>` |
+| （非表单字段） | `ai.apiKey` | DeepSeek API 密钥（转录 + 翻译领域独占） | 不注入 yt-dlp；只在 DeepSeek 请求的 `Authorization` 头中使用 |
 
 ## stronghold_init
 

@@ -3,13 +3,13 @@ status: current
 layer: root
 canonical_for:
   - docs-index
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # Open Video Downloader 文档路由图
 
 本项目是 Tauri v2 桌面应用：Vue 3 + TypeScript 前端（`src/`）+ Rust 后端（`src-tauri/`），
-用 yt-dlp 完成视频、音频、字幕与元数据的批量下载。应用版本 `3.2.1`，许可证 AGPL-3.0-or-later。
+把一批 YouTube 链接转录为英文原稿并用 DeepSeek 翻译成中文译稿（两份 txt）。应用版本 `3.2.1`，许可证 AGPL-3.0-or-later。
 
 ## 先读这些
 
@@ -22,6 +22,7 @@ last_verified: 2026-09-17
 
 | 领域 | 一句话职责 | 入口 |
 | --- | --- | --- |
+| transcribe-translate | 批量转录 + AI 中文翻译：环境门禁、音频获取、分块转录、翻译与保真、产物与续跑 | `current/domains/transcribe-translate/index.md` |
 | media-queue | 入队 → 抓取元数据 → 播放列表处理 → 队列卡片状态机 → 触发下载 | `current/domains/media-queue/index.md` |
 | download-engine | 把下载项翻译成 yt-dlp 参数、执行进程、解析进度/目标路径/诊断 | `current/domains/download-engine/index.md` |
 | toolchain | yt-dlp / ffmpeg 二进制清单校验、下载、安装与版本追踪 | `current/domains/toolchain/index.md` |
