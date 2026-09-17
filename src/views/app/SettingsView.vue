@@ -79,7 +79,7 @@ const isSaving = ref(false);
 const isResetting = ref(false);
 const hasChanges = computed(
   () => JSON.stringify(draft.value) !== JSON.stringify(settingsStore.settings)
-    || !!strongholdStore.aiApiKeyDraft,
+    || strongholdStore.aiApiKeyDirty,
 );
 
 const saveSettings = async () => {
@@ -91,11 +91,12 @@ const saveSettings = async () => {
     }
 
     // The API key is not part of the persisted settings; it is committed here so the
-    // page keeps a single Save action.
+    // page keeps a single Save action. The typed value stays in the field on purpose:
+    // clearing it made the save look like a data loss.
     const apiKey = strongholdStore.aiApiKeyDraft?.trim();
-    if (apiKey) {
+    if (apiKey && strongholdStore.aiApiKeyDirty) {
       await strongholdStore.setAiApiKey(apiKey);
-      strongholdStore.aiApiKeyDraft = null;
+      strongholdStore.aiApiKeyDirty = false;
       await transcriptionStore.runProbe();
     }
 
@@ -114,6 +115,7 @@ const resetSettings = async () => {
     const newSettings = await settingsStore.reset();
     draft.value = structuredClone<Settings>(toRaw(newSettings));
     strongholdStore.aiApiKeyDraft = null;
+    strongholdStore.aiApiKeyDirty = false;
     if (newSettings.appearance.theme) {
       setTheme(newSettings.appearance.theme);
     }

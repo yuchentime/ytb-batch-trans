@@ -76,8 +76,11 @@ const apiKeyDraft = computed({
   get: () => strongholdStore.aiApiKeyDraft,
   set: (value: string | null) => {
     strongholdStore.aiApiKeyDraft = value;
+    strongholdStore.aiApiKeyDirty = true;
   },
 });
 
-const hasPendingKey = computed(() => !!strongholdStore.aiApiKeyDraft?.trim());
+const hasPendingKey = computed(
+  () => strongholdStore.aiApiKeyDirty && !!strongholdStore.aiApiKeyDraft?.trim(),
+);
 </script>

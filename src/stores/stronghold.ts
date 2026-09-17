@@ -32,8 +32,10 @@ export interface StrongholdFields {
 export const useStrongholdStore = defineStore('stronghold', () => {
   const status = ref<StrongholdStatus>({ ...defaultStrongholdStatus });
   const availableKeys = ref<number[][]>([]);
-  /** Unsaved API key typed in the settings page; committed by the global Save action. */
+  /** What the settings page shows in the API key field; kept after save so the user can see it. */
   const aiApiKeyDraft = ref<string | null>(null);
+  /** True when the draft changed since the last commit; drives the global Save enablement. */
+  const aiApiKeyDirty = ref(false);
 
   async function loadStatus(): Promise<StrongholdStatus> {
     const strongholdStatus: StrongholdInitPayload = await invoke('stronghold_status');
@@ -120,6 +122,7 @@ export const useStrongholdStore = defineStore('stronghold', () => {
     status,
     availableKeys,
     aiApiKeyDraft,
+    aiApiKeyDirty,
     hasAvailableKeys,
     loadStatus,
     initialize,

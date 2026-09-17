@@ -18,6 +18,7 @@ const showToast = vi.fn();
 const setTheme = vi.fn();
 const openInternalPath = vi.fn();
 const aiApiKeyDraft = ref<string | null>(null);
+const aiApiKeyDirty = ref(false);
 const setAiApiKey = vi.fn();
 const runProbe = vi.fn();
 
@@ -56,6 +57,12 @@ vi.mock('../../src/stores/stronghold', () => ({
     },
     set aiApiKeyDraft(value: string | null) {
       aiApiKeyDraft.value = value;
+    },
+    get aiApiKeyDirty() {
+      return aiApiKeyDirty.value;
+    },
+    set aiApiKeyDirty(value: boolean) {
+      aiApiKeyDirty.value = value;
     },
     setAiApiKey,
   }),
@@ -224,6 +231,7 @@ describe('SettingsView', () => {
     setAiApiKey.mockReset();
     runProbe.mockReset();
     aiApiKeyDraft.value = null;
+    aiApiKeyDirty.value = false;
     patch.mockImplementation(async () => {});
     setAiApiKey.mockImplementation(async () => {});
     runProbe.mockImplementation(async () => {});
@@ -244,7 +252,9 @@ describe('SettingsView', () => {
     await nextTick();
 
     expect(setAiApiKey).toHaveBeenCalledWith('sk-test');
-    expect(aiApiKeyDraft.value).toBeNull();
     expect(runProbe).toHaveBeenCalled();
+    // The typed key stays visible after saving so the save does not look like data loss.
+    expect(aiApiKeyDirty.value).toBe(false);
+    expect((wrapper.get('#deepseek-api-key').element as HTMLInputElement).value).toBe('sk-test');
   });
 });
