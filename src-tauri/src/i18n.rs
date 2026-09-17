@@ -5,6 +5,7 @@ use std::{collections::HashMap, sync::RwLock};
 use tauri::{AppHandle, Manager};
 
 pub const FALLBACK_LOCALE: &str = "en";
+pub const SIMPLIFIED_CHINESE_LOCALE: &str = "zh-CN";
 
 static LOCALES_DIR: Dir = include_dir!("./locales");
 
@@ -31,16 +32,9 @@ impl I18nManager {
   pub fn set_locale(&self, locale: &str) -> bool {
     let norm = normalize_locale_code(locale);
 
-    let resolved = if self.locales.contains_key(&norm) {
-      norm
-    } else if let Some(primary) = norm.split('-').next() {
-      if self.locales.contains_key(primary) {
-        primary.to_string()
-      } else {
-        return false;
-      }
-    } else {
-      return false;
+    let resolved = match resolve_known_locale(&self.locales, &norm) {
+      Some(resolved) => resolved,
+      None => return false,
     };
 
     let mut guard = self
@@ -185,13 +179,8 @@ fn resolve_locale_from_sources(
     if !raw.is_empty() {
       let norm = normalize_locale_code(raw);
 
-      if locales.contains_key(&norm) {
-        return norm;
-      }
-      if let Some(primary) = norm.split('-').next() {
-        if locales.contains_key(primary) {
-          return primary.to_string();
-        }
+      if let Some(locale) = resolve_known_locale(locales, &norm) {
+        return locale;
       }
     }
   }
@@ -199,17 +188,35 @@ fn resolve_locale_from_sources(
   if let Some(sys) = sys_locale::get_locale() {
     let norm = normalize_locale_code(&sys);
 
-    if locales.contains_key(&norm) {
-      return norm;
-    }
-    if let Some(primary) = norm.split('-').next() {
-      if locales.contains_key(primary) {
-        return primary.to_string();
-      }
+    if let Some(locale) = resolve_known_locale(locales, &norm) {
+      return locale;
     }
   }
 
   FALLBACK_LOCALE.to_string()
+}
+
+/// Resolve a normalized locale code against the embedded packs: exact match first,
+/// then the language-only code, then the Simplified Chinese pack for any Chinese
+/// variant (the app no longer ships a Traditional Chinese UI).
+fn resolve_known_locale(locales: &HashMap<String, Value>, normalized: &str) -> Option<String> {
+  if locales.contains_key(normalized) {
+    return Some(normalized.to_string());
+  }
+
+  if let Some(primary) = normalized.split('-').next() {
+    if locales.contains_key(primary) {
+      return Some(primary.to_string());
+    }
+  }
+
+  if (normalized == "zh" || normalized.starts_with("zh-"))
+    && locales.contains_key(SIMPLIFIED_CHINESE_LOCALE)
+  {
+    return Some(SIMPLIFIED_CHINESE_LOCALE.to_string());
+  }
+
+  None
 }
 
 fn select_plural_variant(raw: &str, count: i64) -> String {
@@ -254,5 +261,47 @@ fn select_plural_variant(raw: &str, count: i64) -> String {
         parts[parts.len() - 1].to_string()
       }
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use serde_json::json;
+
+  fn locale_packs() -> HashMap<String, Value> {
+    HashMap::from([
+      ("en".to_string(), json!({})),
+      (SIMPLIFIED_CHINESE_LOCALE.to_string(), json!({})),
+    ])
+  }
+
+  #[test]
+  fn chinese_variants_resolve_to_the_simplified_pack() {
+    let locales = locale_packs();
+
+    for code in ["zh", "zh-Hans", "zh-CN", "zh-TW", "zh-Hant", "zh-HK"] {
+      assert_eq!(
+        resolve_known_locale(&locales, &normalize_locale_code(code)),
+        Some(SIMPLIFIED_CHINESE_LOCALE.to_string()),
+        "expected {code} to resolve to the Simplified Chinese pack"
+      );
+    }
+  }
+
+  #[test]
+  fn exact_locale_match_wins_over_the_language_code() {
+    let mut locales = locale_packs();
+    locales.insert("zh-TW".to_string(), json!({}));
+
+    assert_eq!(
+      resolve_known_locale(&locales, "zh-TW"),
+      Some("zh-TW".to_string())
+    );
+  }
+
+  #[test]
+  fn unknown_locale_is_not_resolved() {
+    assert_eq!(resolve_known_locale(&locale_packs(), "fr"), None);
   }
 }

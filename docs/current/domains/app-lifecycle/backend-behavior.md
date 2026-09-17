@@ -7,7 +7,7 @@ canonical_for:
 related:
   - docs/current/platform/backend-runtime.md
   - docs/current/platform/storage.md
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # app-lifecycle 后端行为
@@ -77,7 +77,7 @@ updater、stronghold、platform、notify）。新增命令必须同时加入此�
 ### i18n（`i18n.rs`）
 
 - `include_dir!("./locales")` 把后端 locale 编进二进制（无需运行时资源文件）。
-- `set_locale`：规范化代码 → 精确匹配 → 退化为语言主码 → 失败返回 false（不改变当前 locale）。
+- `set_locale`：规范化代码 → 精确匹配 → 退化为语言主码 → 中文变体（`zh`/`zh-*`）落到 `zh-CN` → 失败返回 false（不改变当前 locale）。
 - `unset_locale()`：按系统语言重新解析（用于 `appearance.language == "system"`）。
 - `t(key)`：当前 locale 查不到时回退 `en`。
 - `t_with(key, params)`：支持 `{name}` 占位符替换（通知参数）。

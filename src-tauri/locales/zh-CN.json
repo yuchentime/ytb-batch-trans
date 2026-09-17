@@ -1,0 +1,55 @@
+{
+  "tray": {
+    "quit": "退出",
+    "showOrHide": "显示/隐藏窗口",
+    "addToQueue": "从剪贴板添加",
+    "addAndDownload": "从剪贴板添加并下载",
+    "downloadQueue": "下载队列",
+    "shortcuts": {
+      "ctrlShiftV": "Ctrl + Shift + V",
+      "ctrlShiftD": "Ctrl + Shift + D",
+      "ctrlShiftEnter": "Ctrl + Shift + Enter",
+      "altShiftV": "Alt + Shift + V",
+      "altShiftD": "Alt + Shift + D",
+      "altShiftEnter": "Alt + Shift + Enter"
+    }
+  },
+  "notifications": {
+    "queueAdded": {
+      "title": "已添加到队列",
+      "body": "{title}"
+    },
+    "queueDownloading": {
+      "title": "正在下载队列",
+      "body": "正在下载 {n} 个项目 | 正在下载 {n} 个项目"
+    },
+    "queueFinished": {
+      "title": "队列已完成",
+      "body": "已完成下载 {n} 个项目 | 已完成下载 {n} 个项目"
+    },
+    "videoFinished": {
+      "title": "下载完成",
+      "body": "{title}"
+    },
+    "playlistFinished": {
+      "title": "播放列表完成",
+      "body": "{title}"
+    },
+    "videoReady": {
+      "title": "已就绪，可以下载",
+      "body": "{title}"
+    },
+    "playlistReady": {
+      "title": "播放列表已就绪，可以下载",
+      "body": "{title} | {title}（{n} 个项目） | {title}（{n} 个项目）"
+    },
+    "downloadFailed": {
+      "title": "下载失败",
+      "body": "{title}\n{message}"
+    },
+    "batchFinished": {
+      "title": "批量完成",
+      "body": "完成：{done} · 失败：{failed} · 跳过：{skipped}"
+    }
+  }
+}

@@ -7,7 +7,7 @@ canonical_for:
 related:
   - docs/current/platform/backend-runtime.md
   - docs/current/rules/frontend.rules.md
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # 前端运行时
@@ -83,10 +83,10 @@ last_verified: 2026-09-17
 
 ### i18n 细节（`src/i18n.ts`）
 
-- 支持的 locale（`availableLocales`）：`en, es, nl, it, fr, de, nb, ru, tr, pt-PT, pt-BR, zh-TW`。
+- 支持的 locale（`availableLocales`）：`en, es, nl, it, fr, de, nb, ru, tr, pt-PT, pt-BR, zh-CN`。
   **已知缺口**：`src/locales/ko.json`、`src-tauri/locales/ko.json` 已存在（提交 `4501754`），但 `ko` 未注册进 `availableLocales`，
   因此设置页不会列出韩文，`getDefaultLocale()` 也不会命中韩文（会回退英文）。要启用需在 `src/i18n.ts` 注册 `ko` 的 import/messages 与别名。
-- 别名：`pt → pt-PT`、`zh/zh-Hant → zh-TW`、`no/nb-NO → nb`。
+- 别名：`pt → pt-PT`、`zh/zh-Hans/zh-CN → zh-CN`、`no/nb-NO → nb`。旧的 `zh-TW`/`zh-Hant` 会经语言主码回落到 `zh-CN`（应用不再提供繁体界面）。
 - `getDefaultLocale()`：按 `detectBrowserLanguageCodes()` 依次尝试精确匹配 → 别名 → 语言主码 → 回退 `en`。
 - `fallbackLocale: 'en'`；`globalInjection: false`（组件内显式 `useI18n()`）。
 - 类型安全：`MessageSchema = typeof en`，其它语言用 `as unknown as MessageSchema` 强转（**不做键校验**），键一致性由 ESLint 的 `@intlify/eslint-plugin-vue-i18n` 保证。

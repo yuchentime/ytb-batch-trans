@@ -10,7 +10,7 @@ import ruRaw from './locales/ru.json';
 import trRaw from './locales/tr.json';
 import ptPTRaw from './locales/pt-PT.json';
 import ptBRRaw from './locales/pt-BR.json';
-import zhTWRaw from './locales/zh-TW.json';
+import zhCNRaw from './locales/zh-CN.json';
 import { detectBrowserLanguageCodes } from './helpers/subtitles/languages.ts';
 
 export const availableLocales = {
@@ -25,7 +25,7 @@ export const availableLocales = {
   'tr': true,
   'pt-PT': true,
   'pt-BR': true,
-  'zh-TW': true,
+  'zh-CN': true,
 } as const;
 
 type MessageSchema = typeof en;
@@ -41,37 +41,55 @@ const ru = ruRaw as unknown as MessageSchema;
 const tr = trRaw as unknown as MessageSchema;
 const ptPT = ptPTRaw as unknown as MessageSchema;
 const ptBR = ptBRRaw as unknown as MessageSchema;
-const zhTW = zhTWRaw as unknown as MessageSchema;
+const zhCN = zhCNRaw as unknown as MessageSchema;
 
 const localeAliases: Record<string, Locale> = {
   'pt': 'pt-PT',
   'pt-PT': 'pt-PT',
   'pt-BR': 'pt-BR',
-  'zh': 'zh-TW',
-  'zh-Hant': 'zh-TW',
-  'zh-TW': 'zh-TW',
+  'zh': 'zh-CN',
+  'zh-Hans': 'zh-CN',
+  'zh-CN': 'zh-CN',
   'no': 'nb',
   'nb-NO': 'nb',
 };
 
+function matchLocale(code: string): Locale | null {
+  const normalized = code.trim().replace(/_/g, '-');
+  if (!normalized) {
+    return null;
+  }
+
+  if (normalized in availableLocales) {
+    return normalized as Locale;
+  }
+
+  if (normalized in localeAliases) {
+    return localeAliases[normalized];
+  }
+
+  const baseCode = normalized.split('-')[0];
+
+  if (baseCode in availableLocales) {
+    return baseCode as Locale;
+  }
+
+  if (baseCode in localeAliases) {
+    return localeAliases[baseCode];
+  }
+
+  return null;
+}
+
+export function resolveLocale(code: string | null | undefined): Locale {
+  return (code ? matchLocale(code) : null) ?? 'en';
+}
+
 export function getDefaultLocale(): Locale {
   for (const code of detectBrowserLanguageCodes()) {
-    if (code in availableLocales) {
-      return code as Locale;
-    }
-
-    if (code in localeAliases) {
-      return localeAliases[code];
-    }
-
-    const baseCode = code.split('-')[0];
-
-    if (baseCode in availableLocales) {
-      return baseCode as Locale;
-    }
-
-    if (baseCode in localeAliases) {
-      return localeAliases[baseCode];
+    const resolved = matchLocale(code);
+    if (resolved) {
+      return resolved;
     }
   }
 
@@ -95,6 +113,6 @@ export const i18n = createI18n<[MessageSchema], Locale, false>({
     tr,
     'pt-PT': ptPT,
     'pt-BR': ptBR,
-    'zh-TW': zhTW,
+    'zh-CN': zhCN,
   },
 });

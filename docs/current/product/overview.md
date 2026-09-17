@@ -7,7 +7,7 @@ canonical_for:
 related:
   - docs/current/product/glossary.md
   - docs/current/domains/media-queue/index.md
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # 产品概览
@@ -23,7 +23,7 @@ last_verified: 2026-09-17
 - **版本**：`3.2.1`（`package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 三处保持一致）。
 - **核心能力**：把 URL（单视频、播放列表、多站点）交给内置的 yt-dlp 完成下载，产出视频/音频文件，可选字幕、元数据、缩略图与 SponsorBlock 处理；不做内容解析、转码服务或云端中转。
 - **维护的运行时依赖**：应用自带 yt-dlp 与 ffmpeg，通过签名清单自动下载与更新（见 `docs/current/domains/toolchain/`）。
-- **界面语言**：12 种已注册的前端语言（de/en/es/fr/it/nb/nl/pt-BR/pt-PT/ru/tr/zh-TW）；后端（托盘/通知）同步提供同名语言包。
+- **界面语言**：12 种已注册的前端语言（de/en/es/fr/it/nb/nl/pt-BR/pt-PT/ru/tr/zh-CN）；后端（托盘/通知）同步提供同名语言包。
   已知缺口：`src/locales/ko.json` 与 `src-tauri/locales/ko.json` 已存在，但 `src/i18n.ts` 的 `availableLocales` 未注册 `ko`，因此韩文当前无法在设置中选择（后端 key 已可用）。
 - **隐私**：除应用自更新、yt-dlp 清单、以及可选的 Sentry 崩溃/错误上报外，不向自建服务上传用户数据；下载请求直连目标站点（或用户配置的代理）。
 

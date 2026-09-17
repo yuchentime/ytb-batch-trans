@@ -7,7 +7,7 @@ canonical_for:
 related:
   - docs/current/platform/frontend-runtime.md
   - docs/current/domains/settings-preferences/frontend-behavior.md
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # app-lifecycle 前端行为
@@ -52,8 +52,8 @@ last_verified: 2026-09-17
 
 - `useTheme()`：`theme` 计算属性直接读写 `settingsStore.settings.appearance.theme`（setter 会 `patch`）；
   `system` 模式移除 `data-theme`；`applyTheme(color)` 同时更新 `<meta name="color-scheme">`。
-- 语言：`settingsStore.applySettings` 在每次加载/保存后设置 `i18n.global.locale` 与 `<html lang>`；
-  `i18n.ts` 提供 `getDefaultLocale()`（浏览器语言 → 支持的 locale → `en`）。
+- 语言：`settingsStore.applySettings` 在每次加载/保存后将 `appearance.language`（非 `system` 时经 `resolveLocale()` 解析）写入 `i18n.global.locale` 与 `<html lang>`；
+  `i18n.ts` 提供 `resolveLocale()`（已保存/系统语言 → 已注册 locale，未命中回退 `en`）与 `getDefaultLocale()`（浏览器语言 → 同一套解析 → `en`）；旧值 `zh-TW`/`zh-Hant` 会落到 `zh-CN`。
 - locale 文件：`src/locales/*.json`（13 种）；键结构与 `en.json` 必须一致（ESLint `@intlify` 规则会校验）。
 
 ### 窗口级反馈（`src/tauri/window.ts`）
@@ -99,7 +99,7 @@ last_verified: 2026-09-17
 
 ## Failure And Edge Cases
 
-- `i18n.global.locale.value` 只接受已注册 locale；后端返回未知语言代码时 `as Locale` 断言可能导致回退英文。
+- `resolveLocale()` 只返回已注册 locale；未知/已下线的语言代码会按别名与语言主码归一化（如 `zh-TW → zh-CN`），完全无法识别时回退 `en`，不再使用 `as Locale` 断言。
 - 路由守卫在 group 被删除后自动回首页；`isMissingGroupRedirecting` 防止重复 replace。
 - `TheFooter` 的认证状态灯只反映"配置过"，不反映"有效"。
 - E2E 下不启动窗口观察器与 Tauri mock 之外的原生能力（窗口 API 在 mock 中为 no-op）。

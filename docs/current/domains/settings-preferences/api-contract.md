@@ -7,7 +7,7 @@ canonical_for:
 related:
   - docs/current/shared/ipc-conventions.md
   - docs/current/domains/settings-preferences/data-model.md
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # settings-preferences 接口契约
@@ -47,7 +47,7 @@ last_verified: 2026-09-17
 
 ```json
 // 只改并发与语言，不动其它字段
-{ "performance": { "maxConcurrency": 4 }, "appearance": { "language": "zh-TW" } }
+{ "performance": { "maxConcurrency": 4 }, "appearance": { "language": "zh-CN" } }
 
 // 清空自定义下载目录
 { "output": { "downloadDir": null } }

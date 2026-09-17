@@ -7,7 +7,7 @@ canonical_for:
 related:
   - docs/current/domains/settings-preferences/data-model.md
   - docs/current/domains/settings-preferences/backend-behavior.md
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # settings-preferences 流程
@@ -53,7 +53,7 @@ flowchart TD
 ### 前端加载时序（`src/main.ts`）
 
 1. `preferencesStore.load()`（失败只 `console.error`）。
-2. `settingsStore.load()`；若 `appearance.theme !== 'system'` 则 `applyTheme(theme)`；按 `appearance.language` 设置 i18n locale 与 `<html lang>`。
+2. `settingsStore.load()`；若 `appearance.theme !== 'system'` 则 `applyTheme(theme)`；按 `appearance.language`（经 `resolveLocale()`）设置 i18n locale 与 `<html lang>`。
 3. 两者都结束后 `invoke('app_ready')`（此时窗口才显示）并挂载 Vue。
 
 ### 写入语义（深合并）
