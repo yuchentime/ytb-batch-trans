@@ -25,11 +25,14 @@
       </template>
       <template v-slot:title>
         <div role="tablist" class="tabs tabs-box flex gap-1">
-          <router-link exactActiveClass="tab-active" role="tab" :to="{ name: 'settings.downloads' }" class="tab">
-            {{ t('settings.tabs.downloads') }}
+          <router-link exactActiveClass="tab-active" role="tab" :to="{ name: 'settings.transcription' }" class="tab">
+            {{ t('settings.tabs.transcription') }}
           </router-link>
-          <router-link exactActiveClass="tab-active" role="tab" :to="{ name: 'settings.app' }" class="tab">
-            {{ t('settings.tabs.app') }}
+          <router-link exactActiveClass="tab-active" role="tab" :to="{ name: 'settings.translation' }" class="tab">
+            {{ t('settings.tabs.translation') }}
+          </router-link>
+          <router-link exactActiveClass="tab-active" role="tab" :to="{ name: 'settings.output' }" class="tab">
+            {{ t('settings.tabs.output') }}
           </router-link>
           <router-link exactActiveClass="tab-active" role="tab" :to="{ name: 'settings.network' }" class="tab">
             {{ t('settings.tabs.network') }}

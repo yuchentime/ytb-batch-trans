@@ -545,11 +545,82 @@
       "confirm": "再次点击以重置"
     },
     "tabs": {
-      "downloads": "下载",
-      "app": "应用",
+      "transcription": "转录",
+      "translation": "翻译",
+      "output": "输出",
       "network": "网络",
       "system": "系统",
       "about": "关于"
+    },
+    "transcription": {
+      "legend": "转录",
+      "legendLabel": "每批任务使用的 whisper 与 GPU 设置。",
+      "model": {
+        "label": "模型",
+        "hint": "英文语音清晰时 small 足够；抽查发现明显错误再切 medium。"
+      },
+      "device": {
+        "label": "设备",
+        "hint": "cuda 使用 GPU；cpu 会慢很多。"
+      },
+      "fp16": {
+        "label": "使用 fp16（仅 GPU）"
+      },
+      "language": {
+        "label": "语言",
+        "hint": "auto 由 whisper 自动检测。"
+      },
+      "chunkMinutes": {
+        "label": "分块长度（分钟）",
+        "hint": "0 表示整段一次转录。"
+      },
+      "keepAudio": {
+        "label": "转录完成后保留音频文件"
+      },
+      "conditionOnPreviousText": {
+        "label": "参考前文（condition_on_previous_text）",
+        "hint": "保持关闭可减少长视频的重复/幻觉循环。"
+      },
+      "whisperPath": {
+        "label": "whisper 可执行文件（可选）",
+        "hint": "环境检查在 PATH 中找不到 whisper 时在此指定。"
+      }
+    },
+    "translation": {
+      "legend": "AI 翻译",
+      "legendLabel": "文稿文本会发送到所配置的 OpenAI 兼容服务。",
+      "key": {
+        "label": "DeepSeek API 密钥",
+        "placeholder": "sk-…",
+        "save": "保存密钥",
+        "configured": "已配置",
+        "missing": "未配置",
+        "saved": "密钥已保存。",
+        "hint": "保存在加密保险库中，保存后不再回显。"
+      },
+      "baseUrl": {
+        "label": "Base URL"
+      },
+      "model": {
+        "label": "模型"
+      },
+      "temperature": {
+        "label": "温度",
+        "hint": "越低越贴近原文。"
+      },
+      "concurrency": {
+        "label": "并发块数"
+      },
+      "maxRetries": {
+        "label": "每块重试次数"
+      },
+      "dropFillers": {
+        "label": "译稿中去除口头填充词与明显口误"
+      },
+      "glossary": {
+        "label": "术语表",
+        "hint": "每行 `原文=译文`，应用于所有块。"
+      }
     },
     "performance": {
       "legend": "性能",
@@ -592,114 +663,16 @@
     },
     "output": {
       "legend": "输出",
-      "legendLabel": "设置下载的文件类型。",
-      "addThumbnail": {
-        "label": "添加封面图片：",
-        "hint": "将缩略图嵌入文件，让媒体播放器显示封面。"
+      "legendLabel": "文稿的写入位置与重跑行为。",
+      "rootDir": {
+        "label": "根目录",
+        "hint": "每个视频在根目录下生成独立文件夹，内含 transcript.en.txt 与 transcript.zh.txt。"
       },
-      "saveThumbnail": {
-        "label": "保存缩略图文件：",
-        "hint": "在媒体文件旁下载可用的最佳缩略图。"
+      "overwrite": {
+        "label": "覆盖已存在的文稿"
       },
-      "addMetadata": {
-        "label": "添加标题和艺术家信息：",
-        "hint": "将标题、上传者/艺术家和描述等元数据保存到文件中。"
-      },
-      "partialDownload": {
-        "legend": "部分下载",
-        "hint": "用时间戳或章节，只下载部分内容。",
-        "use": "使用",
-        "useTimes": "时间戳",
-        "useChapter": "章节",
-        "chapter": "章节",
-        "startAt": "开始于",
-        "stopAt": "结束于",
-        "invalidHint": "无效的时间戳会被忽略。",
-        "allChapters": "所有章节",
-        "errors": {
-          "invalid": "请输入有效的时间。",
-          "beforeStart": "结束时间必须晚于开始时间。",
-          "exceedsDuration": "时间戳不能超过视频时长。"
-        }
-      },
-      "location": {
-        "label": "下载位置和文件名：",
-        "link": "配置下载位置"
-      },
-      "subtitles": {
-        "label": "添加字幕：",
-        "link": "配置字幕"
-      },
-      "keepOriginalStreams": {
-        "label": "保留原始流",
-        "hint": "除非所选的后处理步骤需要，否则避免转换容器或重新编码。"
-      },
-      "postprocess": {
-        "label": "视频后处理：",
-        "hint": "后处理会在下载完成后运行。",
-        "reencodeWarning": "此选项会重新编码，开销较大且可能耗时较长。",
-        "keepOriginalStreamsConflict": "此选项需要重新编码。请禁用“保留原始流”后再使用。",
-        "mp42RequiresMp4": "此选项需要输出 MP4。",
-        "options": {
-          "none": "无",
-          "fps30": "重新编码为 30 fps",
-          "mp42": "将 MP4 brand 设为 mp42",
-          "custom": "自定义"
-        }
-      },
-      "postprocessMode": {
-        "label": "自定义后处理模式：",
-        "hint": "选择自定义 ffmpeg 参数在重新封装还是重新编码期间执行。",
-        "options": {
-          "remux": "在重新封装期间执行",
-          "reencode": "在重新编码期间执行"
-        }
-      },
-      "postprocessArgs": {
-        "label": "高级 ffmpeg 参数：",
-        "hint": "仅限高级用户。参数之间用空格分隔；引号会被保留。"
-      },
-      "tabs": {
-        "audio": {
-          "screenreader": "音频设置",
-          "label": "音频",
-          "format": {
-            "label": "音频格式：",
-            "hint": "选择首选的音频格式。",
-            "options": {
-              "mp3": "MP3（推荐）",
-              "m4a": "M4A",
-              "ogg": "OGG",
-              "aac": "AAC",
-              "opus": "Opus",
-              "wav": "WAV",
-              "flac": "FLAC"
-            }
-          },
-          "postprocess": {
-            "label": "音频后处理：",
-            "options": {
-              "none": "无",
-              "custom": "自定义"
-            }
-          }
-        },
-        "video": {
-          "screenreader": "视频设置",
-          "label": "视频",
-          "container": {
-            "label": "视频格式：",
-            "hint": "选择首选的视频容器格式。",
-            "options": {
-              "mp4": "MP4",
-              "mkv": "MKV"
-            }
-          }
-        }
-      },
-      "preciseCuts": {
-        "label": "精确裁剪：",
-        "hint": "在精确帧处裁剪，而不是在附近的关键帧处裁剪。速度非常慢。\n只有在常规裁剪结果错误、损坏或出现黑屏/缺失片段时才启用。"
+      "restrictFilenames": {
+        "label": "目录名仅保留 ASCII/CJK 字母数字"
       }
     },
     "appearance": {

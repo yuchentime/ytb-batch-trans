@@ -93,9 +93,17 @@ export const useStrongholdStore = defineStore('stronghold', () => {
     availableKeys.value = await invoke<number[][]>('stronghold_keys');
   }
 
+  /** Writes the DeepSeek key; it is never read back into the UI (presence shows via the probe). */
+  async function setAiApiKey(value: string): Promise<void> {
+    const encoder = new TextEncoder();
+    await invoke('stronghold_set', {
+      entries: { 'ai.apiKey': Array.from(encoder.encode(value)) },
+    });
+  }
+
   function hasAvailableKeys(): boolean {
     return availableKeys.value.length > 0;
   }
 
-  return { status, availableKeys, hasAvailableKeys, loadStatus, initialize, getValues, setValues };
+  return { status, availableKeys, hasAvailableKeys, loadStatus, initialize, getValues, setValues, setAiApiKey };
 });

@@ -18,8 +18,9 @@ import TheNetworkPreferences from './components/media-view/TheNetworkPreferences
 import TheOutputPreferences from './components/media-view/TheOutputPreferences.vue';
 import TheSubtitlePreferences from './components/media-view/TheSubtitlePreferences.vue';
 import SettingsAboutTab from './views/app/settings/SettingsAboutTab.vue';
-import SettingsAppTab from './views/app/settings/SettingsAppTab.vue';
-import SettingsDownloadsTab from './views/app/settings/SettingsDownloadsTab.vue';
+import SettingsTranscriptionTab from './views/app/settings/SettingsTranscriptionTab.vue';
+import SettingsTranslationTab from './views/app/settings/SettingsTranslationTab.vue';
+import SettingsOutputTab from './views/app/settings/SettingsOutputTab.vue';
 import SettingsNetworkTab from './views/app/settings/SettingsNetworkTab.vue';
 import SettingsSystemTab from './views/app/settings/SettingsSystemTab.vue';
 
@@ -62,14 +63,20 @@ const routes = [
         children: [
           {
             path: '',
-            name: 'settings.downloads',
-            component: SettingsDownloadsTab,
+            name: 'settings.transcription',
+            component: SettingsTranscriptionTab,
             meta: { index: 0 },
           },
           {
-            path: 'app',
-            name: 'settings.app',
-            component: SettingsAppTab,
+            path: 'translation',
+            name: 'settings.translation',
+            component: SettingsTranslationTab,
+            meta: { index: 1 },
+          },
+          {
+            path: 'output',
+            name: 'settings.output',
+            component: SettingsOutputTab,
             meta: { index: 1 },
           },
           {

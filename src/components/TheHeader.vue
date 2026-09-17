@@ -78,7 +78,7 @@
       <span class="sr-only">{{ t('layout.header.nav.setup') }}</span>
       <wrench-screwdriver-icon class="w-6 h-6"/>
     </router-link>
-    <router-link class="btn btn-subtle" :title="t('layout.header.nav.settings')" :to="{ name: 'settings.downloads' }">
+    <router-link class="btn btn-subtle" :title="t('layout.header.nav.settings')" :to="{ name: 'settings.transcription' }">
       <span class="sr-only">{{ t('layout.header.nav.settings') }}</span>
       <cog8-tooth-icon class="w-6 h-6"/>
     </router-link>

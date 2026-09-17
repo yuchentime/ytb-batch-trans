@@ -3,14 +3,14 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { defineComponent, nextTick, reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import SettingsView from '../../src/views/app/SettingsView.vue';
-import SettingsDownloadsTab from '../../src/views/app/settings/SettingsDownloadsTab.vue';
-import SettingsAppTab from '../../src/views/app/settings/SettingsAppTab.vue';
+import SettingsTranscriptionTab from '../../src/views/app/settings/SettingsTranscriptionTab.vue';
+import SettingsTranslationTab from '../../src/views/app/settings/SettingsTranslationTab.vue';
+import SettingsOutputTab from '../../src/views/app/settings/SettingsOutputTab.vue';
 import SettingsNetworkTab from '../../src/views/app/settings/SettingsNetworkTab.vue';
 import SettingsSystemTab from '../../src/views/app/settings/SettingsSystemTab.vue';
 import SettingsAboutTab from '../../src/views/app/settings/SettingsAboutTab.vue';
 import { i18n } from '../../src/i18n';
 import { defaultSettings, type Settings } from '../../src/tauri/types/config';
-import { TranscodePolicy } from '../../src/tauri/types/media';
 
 const patch = vi.fn();
 const reset = vi.fn();
@@ -68,21 +68,6 @@ function createSettingsRouter() {
         component: createBlankView(),
       },
       {
-        path: '/location',
-        name: 'location',
-        component: createBlankView(),
-      },
-      {
-        path: '/subtitles',
-        name: 'subtitles',
-        component: createBlankView(),
-      },
-      {
-        path: '/authentication',
-        name: 'authentication',
-        component: createBlankView(),
-      },
-      {
         path: '/',
         component: createRoot(),
         children: [
@@ -92,13 +77,18 @@ function createSettingsRouter() {
             children: [
               {
                 path: '',
-                name: 'settings.downloads',
-                component: SettingsDownloadsTab,
+                name: 'settings.transcription',
+                component: SettingsTranscriptionTab,
               },
               {
-                path: 'app',
-                name: 'settings.app',
-                component: SettingsAppTab,
+                path: 'translation',
+                name: 'settings.translation',
+                component: SettingsTranslationTab,
+              },
+              {
+                path: 'output',
+                name: 'settings.output',
+                component: SettingsOutputTab,
               },
               {
                 path: 'network',
@@ -125,7 +115,7 @@ function createSettingsRouter() {
 }
 
 describe('SettingsView', () => {
-  it('renders the router-link tabs used by the media views', async () => {
+  it('renders the transcribe settings tabs and switches between them', async () => {
     const router = createSettingsRouter();
     await router.push('/settings');
     await router.isReady();
@@ -140,15 +130,16 @@ describe('SettingsView', () => {
 
     const tabs = wrapper.findAll('a[role="tab"]');
     expect(tabs.map(tab => tab.text())).toEqual([
-      'Downloads',
-      'App',
+      'Transcription',
+      'Translation',
+      'Output',
       'Network',
       'System',
       'About',
     ]);
     expect(tabs[0].classes()).toContain('tab-active');
 
-    await router.push('/settings/app');
+    await router.push('/settings/translation');
     await nextTick();
 
     const updatedTabs = wrapper.findAll('a[role="tab"]');
@@ -184,12 +175,12 @@ describe('SettingsView', () => {
     });
 
     await nextTick();
-    await wrapper.get('#keep-original-streams-video').setValue(true);
+    await wrapper.get('input[type="checkbox"]').setValue(false);
     await wrapper.get('form').trigger('submit');
     await nextTick();
 
     expect(patch).toHaveBeenCalledTimes(1);
-    expect(patch.mock.calls[0][0].output.video.policy).toBe(TranscodePolicy.never);
+    expect(patch.mock.calls[0][0].transcription.fp16).toBe(false);
     expect(showToast).toHaveBeenCalledWith('Settings saved!', { style: 'success' });
 
     const resetButton = wrapper
@@ -202,6 +193,6 @@ describe('SettingsView', () => {
 
     expect(reset).toHaveBeenCalledTimes(1);
     expect(showToast).toHaveBeenCalledWith('Reset settings to defaults.', { style: 'success' });
-    expect(wrapper.get('#keep-original-streams-video').element).toBeInstanceOf(HTMLInputElement);
+    expect(wrapper.get('input[type="checkbox"]').element).toBeInstanceOf(HTMLInputElement);
   });
 });

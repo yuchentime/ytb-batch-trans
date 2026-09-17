@@ -1,61 +1,35 @@
 <template>
-  <base-fieldset
-    :legend="t('settings.output.legend')"
-    :label="t('settings.output.legendLabel')"
-  >
-    <output-settings-editor v-model="outputState">
-      <template #after-common>
-        <div class="mt-2 flex flex-col gap-4">
-          <div class="flex flex-col gap-1">
-            <p class="font-semibold">
-              {{ t('settings.output.location.label') }}
-            </p>
-            <router-link
-              class="text-primary group font-semibold flex gap-1 items-center"
-              :to="{ name: 'location' }"
-            >
-              {{ t('settings.output.location.link') }}
-              <arrow-right-icon
-                class="w-5 h-5 group-focus:translate-x-1 group-hover:translate-x-1 transition-transform"
-              />
-            </router-link>
-          </div>
+  <base-fieldset :legend="t('settings.output.legend')" :label="t('settings.output.legendLabel')">
+    <div class="grid grid-cols-1 gap-y-4">
+      <label class="form-control">
+        <span class="label-text">{{ t('settings.output.rootDir.label') }}</span>
+        <input
+            :value="settings.output.rootDir ?? ''"
+            type="text"
+            class="input input-bordered"
+            @input="settings.output.rootDir = ($event.target as HTMLInputElement).value || null"
+        />
+        <span class="label-text-alt">{{ t('settings.output.rootDir.hint') }}</span>
+      </label>
 
-          <div class="flex flex-col gap-1">
-            <p class="font-semibold">
-              {{ t('settings.output.subtitles.label') }}
-            </p>
-            <router-link
-              class="text-primary group font-semibold flex gap-1 items-center"
-              :to="{ name: 'subtitles' }"
-            >
-              {{ t('settings.output.subtitles.link') }}
-              <arrow-right-icon
-                class="w-5 h-5 group-focus:translate-x-1 group-hover:translate-x-1 transition-transform"
-              />
-            </router-link>
-          </div>
-        </div>
-      </template>
-    </output-settings-editor>
+      <label class="label cursor-pointer justify-start gap-3">
+        <input v-model="settings.output.overwrite" type="checkbox" class="checkbox" />
+        <span class="label-text">{{ t('settings.output.overwrite.label') }}</span>
+      </label>
+
+      <label class="label cursor-pointer justify-start gap-3">
+        <input v-model="settings.output.restrictFilenames" type="checkbox" class="checkbox" />
+        <span class="label-text">{{ t('settings.output.restrictFilenames.label') }}</span>
+      </label>
+    </div>
   </base-fieldset>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import BaseFieldset from '../base/BaseFieldset.vue';
-import OutputSettingsEditor from '../output/OutputSettingsEditor.vue';
-import { Settings } from '../../tauri/types/config';
-import { ArrowRightIcon } from '@heroicons/vue/24/solid';
 import { useI18n } from 'vue-i18n';
+import BaseFieldset from '../base/BaseFieldset.vue';
+import { Settings } from '../../tauri/types/config.ts';
 
 const { t } = useI18n();
 const settings = defineModel<Settings>({ required: true });
-
-const outputState = computed({
-  get: () => settings.value.output,
-  set: (value) => {
-    settings.value.output = value;
-  },
-});
 </script>

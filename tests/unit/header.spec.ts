@@ -91,7 +91,7 @@ describe('TheHeader', () => {
         },
         {
           path: '/settings',
-          name: 'settings.downloads',
+          name: 'settings.transcription',
           component: createBlankView(),
         },
         {
@@ -125,7 +125,7 @@ describe('TheHeader', () => {
     });
 
     const links = wrapper.findAllComponents(RouterLinkStub).map(link => link.props('to'));
-    expect(links).toContainEqual({ name: 'settings.downloads' });
+    expect(links).toContainEqual({ name: 'settings.transcription' });
   });
 
   it('queues parsed urls from the input field', async () => {
