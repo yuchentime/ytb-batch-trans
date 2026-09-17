@@ -262,4 +262,28 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 - **L2 未跑**：AC-15/16/19 的联动判定需要 fake whisper/ffmpeg + mock DeepSeek + 真实文件系统（Phase C 第 18 项）；本循环只到 L1 + 编译/clippy/fmt。
 - 跳过路径不发 `media_add`（卡片生成交给 L009 的命令响应 / Phase B）。
 - 同标题视频会落到同一目录（设计既有命名方案的固有风险），已有 `source.json` 可辅助识别但不解决冲突；如需要可在后续循环加目录后缀。
-- 流水线模块在 L009 接线前挂模块级 `#[allow(dead_code)]`，接线后必须删。
+- 流水线模块在 L009 接线前曾挂模块级 `#[allow(dead_code)]`，L009 已全部删除（见 §11.4）。
+
+## 11. 命令接线与 `media_size` 移除（L009）
+
+### 11.1 `transcription_probe`
+
+- 字段：`whisperPath`/`whisperVersion`/`whisperFound`、`cudaAvailable`/`cudaDevice`、`model`/`modelCached`/`modelPath`/`modelSizeBytes`、`ffmpegPath`/`ffprobePath`、`apiKeyConfigured`（只读 stronghold，不验连通性，C3）、`logDir`/`logFile`/`logSizeBytes`（AC-27）。
+- 程序解析 `resolve_program(configured, bin_dir, name)`：显式配置（`transcription.whisperPath`）必须存在；否则按 `bin_dir` → `PATH` 查找，Windows 依次尝试 `.exe/.cmd/.bat`。
+- 探测细节：whisper 版本来自身`python -m pip show openai-whisper`（CLI 无 `--version`）；CUDA 用 `nvidia-smi --query-gpu=name`（驱动级，不加载 torch，避免探针卡 10s+）；模型缓存路径 `~/.cache/whisper/<model>.pt`（模型名 small/medium/large-v3）；所有外部命令经 `spawn_blocking` + `configure_command`（无窗口）。
+- 探针同时写文件日志 `probe.ok`/`probe.missing`（AC-24）。
+
+### 11.2 `transcribe_start` 与门禁
+
+- 流程：清洗/去除空 URL → 非空校验 → `whisper_found(app)` 门禁（不 spawn，只看解析结果；缺失返回 `Err("whisperMissing")`，AC-01）→ 取 `output.rootDir` → 每条 URL 生成 `group_id`/`id` 并 `ensure_group_running` → `TranscribeRequest::Batch` → 返回 groupId 列表；同时写 `run.start` 日志。
+- 播放列表自动展开（design §2）**尚未实现**：当前 fetch 阶段对 `ParsedMedia::Playlist` 报 `fetchFailed`；需在 Phase B 前补（小组件：`transcribe_start` 异步展开或 pipeline 内拆组）。
+
+### 11.3 `media_size` 移除清单（已全部完成）
+
+- 后端：命令文件、`lib.rs` 的 `invoke_handler` 条目、`FetchRequest::Size/SizePlaylist` 与其展开/计数分支、`FetchEntry.format`、`MediaAddWithFormatPayload`。
+- 隔离层：`src-isolation/main.ts` 白名单条目（同时补上 `transcribe_start`/`transcription_probe`）。
+- 前端：`src/stores/media/size.ts`、`stores/media/media.ts` 的引用、`listeners/media.ts` 的 `media_size` 订阅、`types/media.ts` 的 `MediaAddWithFormatPayload`、`MediaConfigureStep.vue` 的体积展示与加载按钮（Phase B 会整体替换该步骤；相关 i18n 键暂留待 Phase B 清理）。
+
+### 11.4 死代码豁免清理结果
+
+全部移除：`transcribe/*`、`translation/*`、`scheduling::transcribe_pipeline`、`runners::{ffmpeg,whisper}_runner`、`ytdlp_process::{ProcessResult,run_streaming,tail_excerpt}`、`ytdlp_args::audio_args`、`logging::events`、`file_log` 的 3 处、`stronghold_state` 的 6 处。清理后 clippy 暴露的真实缺口已补齐：`probe.ok/missing`、`audio.download.fail`（含 exit/errCode）、`translate.block.retry`（客户端内按 attempt/status 记录）；pipeline 改用 `plan_skips`/`ArtifactState` 做续跑判定。仅 `DeepseekClient::with_base_delay` 保留 `#[allow(dead_code)]`，注释说明它是 L1/L2 试验接缝。
