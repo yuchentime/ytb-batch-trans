@@ -31,6 +31,7 @@ its status changes.
 | W007 | WARNING | closed | design-review（增量） | 依赖与配置面 | 日志需求新增 `tracing-appender` 依赖与 `logging.verbose` 配置项 | L001 前文档 | 接受：官方 tracing 生态依赖（MIT/Apache-2.0）+ 单一布尔字段（2026-09-17） |
 | W008 | WARNING | closed | design-review（增量） | 脱敏与隐私 | 沿用现网行为记录**完整 URL**，部分站点 URL 带签名 query，会落入本地日志文件 | — | 2026-09-17 开发者决定 A：保留完整 URL（含 query）；缓解=仅本机/不外传/外发前检查提示 |
 | N002 | NOTE | open | design-review（增量） | 可运维性 | 单文件 5MB × 5 的真实写入频率/体积需实测（含 `verbose=true` 时的增长速率） | — | — |
+| W009 | WARNING | open | L010 | 生命周期 — 取消 | 队列中（尚未派发）取消时，transcribe 批次的队列条目被 dispatcher 静默丢弃，批计数不归零：`summary.md`/`batch_summary`/`batchFinished` 都不会产生 | — | — |
 
 ## Close-Out
 
@@ -47,3 +48,4 @@ its status changes.
 | W005 | Phase C 的文档同步循环处理；完成 `docs/current/domains/transcribe-translate/*` 与新路由后关闭 |
 | W008 | ✅ 已关闭（2026-09-17 决定 A：日志记录完整 URL，含 query；缓解：仅本机、不外传、UI/文档提示外发前检查） |
 | N001 / N002 | Phase A 首个视频实测后，把 token 量级与日志体积/增长速率写回 `design.md` 的 Risks 段与 `implementation-notes.md` |
+| W009 | Phase C 的 AC-16 L2 取消测试先修此缺口（候选：pipeline 按 group 记录未上报条目并在取消时合成 `Cancelled` outcome，或让 dispatcher 上报被丢弃的条目），细节见 `implementation-notes.md` §12.3 |

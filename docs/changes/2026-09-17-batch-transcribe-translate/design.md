@@ -159,6 +159,7 @@ fetching → downloadingAudio → transcribing → translating → writing → d
 | `run.start` / `run.end` | INFO | run, count | 批次开始/结束（含成功/失败/跳过计数） |
 | `probe.ok` / `probe.missing` | INFO / ERROR | whisper, cuda, model | 环境探测（启动与手动重检） |
 | `stage.change` | INFO | run, group, stage | 四阶段切换 |
+| `playlist.expand` | INFO | run, group, entries | 播放列表链接展开为逐视频任务（§2） |
 | `audio.download.start` / `.ok` / `.fail` | INFO / INFO / ERROR | group, url, path / exit, errCode | 音频获取 |
 | `duration.resolved` / `duration.unknown` | INFO / ERROR | group, duration / — | 时长获取（元数据或 ffprobe） |
 | `chunk.plan` / `chunk.cut.ok` / `chunk.cut.fail` | INFO / INFO / ERROR | group, chunks, minutes / idx, start, end / idx, exit | 分块 |
@@ -456,6 +457,7 @@ L3 覆盖真实 whisper GPU 转录（含 stdout 进度契约与 OOM 路径）、
 | 文件日志写入器：同步自研 `SizeRotatingFile` 取代 `tracing-appender` 非阻塞 writer | L003（2026-09-17） | §8 与 Alternatives 选定 `tracing-appender` 滚动 non-blocking writer；但其 `Rotation` 仅支持时间维度（`MINUTELY`/`HOURLY`/`DAILY`/`NEVER`），无法实现 AC-25 要求的“单文件 5MB、保留 5 个”体积上限，size-rotation 必须自研。既然 writer 自研，非阻塞包装只增加一个依赖与 guard 生命周期，而每行一次 `write(2)`（无 fsync）不会明显阻塞流水线 | **接受（开发者 2026-09-17 确认）**：改为 `tracing` fmt 层 + 自研 `SizeRotatingFile`（同步、逐行单次写、5MB×5），不新增依赖。若坚持非阻塞，后续把 writer 包一层 `non_blocking` 即可（约 3 行）；需先由 cargo 刷新 `Cargo.lock` |
 | ffmpeg 切块用 `-t <duration>` 而非 `-to <end>` | L004（2026-09-17） | §3 与关键节点表写 `ffmpeg -ss <start> -to <end> -c copy`；输入 `-ss` 与 `-to` 组合时，`-to` 的相对时间轴随 ffmpeg 版本不同（相对 seek 点或文件起点），会切错块长 | 接受：`-ss <start> -i <in> -t <end-start> -c copy <out>`（`-t` 语义无歧义）；块边界仍由 `plan_chunks` 的 `[start, end]` 决定 |
 | 跳过判定新增 `.work/source.json`（URL→输出目录标记） | L008（2026-09-17） | §6 说“产物存在性决定跳过”，但输出目录名来自标题（只能通过 yt-dlp 元数据得到），与 AC-14 的“跳过时零网络请求”矛盾：不联网就无法定位已有目录 | 接受：首次解析标题后写入 `<输出目录>/.work/source.json`（url+title）；重跑时先本地扫描 `output.rootDir` 下各目录的标记，命中且两份 txt 存在 → 零网络跳过。`.work` 仍仅为中间产物；同批次标题重名仍可能目录冲突（已记 implementation-notes §10） |
+| 播放列表展开落在 pipeline 内（同一 group 的逐视频 item），而非显式调用 `media_playlist_expand` 命令 | L010（2026-09-17） | §2 写“复用 `media_playlist_expand` 与 `skipPlaylistSelection`”；`media_playlist_expand` 是面向“前端已拿到条目并选择范围”的场景，转录流没有选择 UI，且 `transcribe_start` 返回 `groupId[]` 的契约要求每输入链接一个 group | 接受：fetch 阶段解析出 `ParsedMedia::Playlist` 后，在同一 group 内为每个条目生成逐视频任务（同 batch、同 group、`total = entries`），`PlaylistEntry.index` 不参与调度；`skipPlaylistSelection` 仅是前端 group 标志，本流不需要。事件表新增 `playlist.expand`（INFO：run/group/entries） |
 
 ## Version History
 

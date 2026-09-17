@@ -276,7 +276,7 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 ### 11.2 `transcribe_start` 与门禁
 
 - 流程：清洗/去除空 URL → 非空校验 → `whisper_found(app)` 门禁（不 spawn，只看解析结果；缺失返回 `Err("whisperMissing")`，AC-01）→ 取 `output.rootDir` → 每条 URL 生成 `group_id`/`id` 并 `ensure_group_running` → `TranscribeRequest::Batch` → 返回 groupId 列表；同时写 `run.start` 日志。
-- 播放列表自动展开（design §2）**尚未实现**：当前 fetch 阶段对 `ParsedMedia::Playlist` 报 `fetchFailed`；需在 Phase B 前补（小组件：`transcribe_start` 异步展开或 pipeline 内拆组）。
+- 播放列表自动展开（design §2）在 L010 补上：fetch 阶段解析出 `ParsedMedia::Playlist` 后由 pipeline 展开为同 group 的逐视频任务（接口、计数与事件见 §12.1）。
 
 ### 11.3 `media_size` 移除清单（已全部完成）
 
@@ -287,3 +287,35 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 ### 11.4 死代码豁免清理结果
 
 全部移除：`transcribe/*`、`translation/*`、`scheduling::transcribe_pipeline`、`runners::{ffmpeg,whisper}_runner`、`ytdlp_process::{ProcessResult,run_streaming,tail_excerpt}`、`ytdlp_args::audio_args`、`logging::events`、`file_log` 的 3 处、`stronghold_state` 的 6 处。清理后 clippy 暴露的真实缺口已补齐：`probe.ok/missing`、`audio.download.fail`（含 exit/errCode）、`translate.block.retry`（客户端内按 attempt/status 记录）；pipeline 改用 `plan_skips`/`ArtifactState` 做续跑判定。仅 `DeepseekClient::with_base_delay` 保留 `#[allow(dead_code)]`，注释说明它是 L1/L2 试验接缝。
+
+## 12. 播放列表展开、批次通知与取消清理（L010）
+
+### 12.1 播放列表展开（design §2）
+
+| 维度 | 决定 |
+| --- | --- |
+| 落点 | `scheduling/transcribe_pipeline.rs` 的 fetch 阶段：`ParsedMedia::Playlist` 不再报 `fetchFailed`；`expand_playlist` 在同一 group 内生成逐视频任务，并通过 `TranscribeRequest::Expand` 追加进正在运行的批次 |
+| group 语义 | 播放列表链接 = 1 个 group（`transcribe_start` 返回的 id 即该 group），每个可用条目 = 该 group 的一个视频 item；`TranscribeEntry.total` 携带组内视频数，子项的 `media_add.total = N` |
+| 事件 | 先发播放列表 leader（`media_add` 的 `item = ParsedPlaylist`，前端可拿 group 标题/条目），再逐个发子视频 `media_add`；新增文件日志事件 `playlist.expand`（INFO：run/group/entries） |
+| 批计数 | `expand_batch(batch_id, children)` 把尚未上报的链接任务槽替换为 N 个子视频（`remaining - 1 + N`）；链接任务返回 `None`（`run_video -> Option<VideoOutcome>`），不产生汇总行 |
+| 续跑 | 每个子视频照常走 AC-14 的本地 `find_existing_output`（子项零网络跳过）；链接本身仍需一次 `-J --flat-playlist` 才能发现条目 |
+| 取消 | 子视频继承链接 group id，`group_cancel` 对整条播放列表生效（见 §12.3/§12.4） |
+| 测试 | `playlist_children_*`（顺序/同 group/去空 URL/`total`）、`flat_playlist_fixture_*`（固定 `-J --flat-playlist` JSON → `parse_ytdlp_info` → 展开）、`expanding_a_playlist_replaces_the_link_slot_in_the_batch` |
+
+### 12.2 `batchFinished` 通知（Phase A 第 10 项）
+
+| 维度 | 决定 |
+| --- | --- |
+| 代码分层 | 新增根模块 `src-tauri/src/notifications.rs`（`NotificationKind` + 泛型 `notify<R: Runtime>`）；`commands/notifications.rs` 变薄壳；`state/config_models.rs` 与 `scheduling/transcribe_pipeline.rs` 依赖该模块，不再反向依赖 `commands` |
+| 触发点 | `transcribe_pipeline::record_outcome` 在批次归零、写 `summary.md`、发 `batch_summary` 之后调用 `notify(BatchFinished)`；成功/失败/混合批次都只通知一次 |
+| 参数 | `done`/`failed`/`skipped` 三个计数（body 不用 `n` 复数选择，避开 12 种语言的复数规则） |
+| key 契约 | 后端 `src-tauri/locales/*.json`：`notifications.batchFinished.title|body`；前端 `src/locales/*.json`：`settings.notifications.disabled.kinds.batchFinished`（13 个语言文件全量补齐） |
+| 测试 | `notifications::tests::every_kind_has_a_backend_and_frontend_locale_entry`（逐 kind 校验两份 en locale）、`batch_finished_keys_follow_the_notification_contract`、`batch_notification_params_*`、`the_last_outcome_writes_the_summary_and_drops_the_batch`（mock app；无 `SharedConfig` 时 `notify` 经 `try_state` 静默跳过） |
+
+### 12.3 取消路径的已知缺口（W009，Phase C 修复）
+
+`GenericDispatcher` 在 `group_cancel` 后会把该 group 尚未派发的队列条目静默丢弃（`queues.retain` 与 `is_group_running` 分支），这些条目不会调用 `record_outcome`；批计数按条目推进，因此**在队列中取消**会让该批永不归零：`summary.md` 不写、`batch_summary`/`batchFinished` 不发。运行中的条目正常上报 `cancelled`。Phase C 的 AC-16 L2 取消测试需要先修此缺口（候选：pipeline 按 group 记录未上报条目、取消时合成 `Cancelled` outcome；或让 dispatcher 上报被丢弃的条目）。
+
+### 12.4 `group_cancel` 清理
+
+`commands/group/group_cancel.rs` 现在也向 `TranscribeSender` 发 `DispatchRequest::Cleanup`，与 fetch/download 一致：取消后移除 `RUNNING_GROUPS` 分组并清掉排队条目（不改运行中任务的取消语义）。
