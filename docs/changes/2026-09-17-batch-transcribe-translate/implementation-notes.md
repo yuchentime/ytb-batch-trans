@@ -341,3 +341,16 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 - `MediaCard.vue` 的 `stepMap` 接入四态；`writing` 复用 `TranslateStep`（design 的步骤清单没有 Writing 组件）。
 - i18n：`media.steps.{audioDownload,transcribe,translate}` 已补 `en` 与 `zh-CN`，其余语言留给第 17 项。
 - 步骤组件按 group 的第一个 item 读取进度；playlist group 拆分（第 13 项）后即为 1:1。
+
+## 14. 环境检查页与输入门禁（L012）
+
+| 维度 | 决定 |
+| --- | --- |
+| probe 动作 | `transcription` store 增 `runProbe()`（`invoke('transcription_probe')`），失败保留上一次结果；`isProbeLoaded`/`isEnvironmentReady` 派生 |
+| 必需项 | `whisperFound && ffmpegPath && ffprobePath`（AC-01 门禁 + 分块依赖）；CUDA、模型缓存、DeepSeek key、日志路径只展示不阻断 |
+| 启动探测 | `main.ts::initStores` 启动时调一次 `runProbe()`（design §8 的“启动与手动重检”）；`/setup` 挂载再探测一次，页内“重新检测”可手动重跑 |
+| 页面 | `src/views/app/SetupView.vue` + 路由 `/setup`（`name: 'setup'`），展示 whisper/CUDA/模型/ffmpeg/ffprobe/key/日志路径与大小；`en`+`zh-CN` 的 `setup.*` 键 |
+| 门禁行为 | `TheHeader`：probe 已加载且必需项缺失时，输入与 Add 禁用、placeholder 改为提示，提交改为 toast + 跳 `/setup`；probe 未加载时不阻断（后端 `transcribe_start` 仍是最终门禁） |
+| mock | `tests/utils/mocks/transcriptionHandlers.ts`（`readyProbe` + `transcription_probe` handler），注册进 `main.ts` 的 E2E mock 组合 |
+| 测试 | store：`runProbe` 调用与 `isEnvironmentReady` 门禁（含 whisper 缺失）；E2E：`tests/e2e/setup.spec.ts` 断言 probe 渲染；`header.spec.ts` 补 `setup` 路由 |
+| 未做（L013） | 首页输入仍是 `media_info`/下载向 `addUrlBatch*`；`transcribe_start` 接线、`configure`/`MediaConfigureStep` 删除、下载向 E2E 退场留到 L013（与流程替换同轮，避免入口空缺） |
