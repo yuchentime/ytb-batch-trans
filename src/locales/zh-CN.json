@@ -190,8 +190,14 @@
   "media": {
     "view": {
       "tabs": {
-        "metadata": "元数据",
+        "en": "英文原稿",
+        "zh": "中文译稿",
         "logs": "日志"
+      },
+      "transcript": {
+        "openDirectory": "打开输出目录",
+        "openFile": "用系统程序打开",
+        "missing": "尚未生成。"
       },
       "thumbnailAlt": "{title} 的缩略图",
       "metadata": {
@@ -211,6 +217,7 @@
         "duration": "时长"
       },
       "logs": {
+  "openFile": "打开日志文件",
         "failure": "失败",
         "errors": {
           "count": "错误 ({count})",

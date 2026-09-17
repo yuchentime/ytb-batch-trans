@@ -52,7 +52,7 @@
     />
     <media-card-action-item
         :disabled="!canViewInfo"
-        :to="{ name: 'group.metadata', params: { groupId: group.id } }"
+        :to="{ name: 'group.en', params: { groupId: group.id } }"
         :label="t('media.card.actions.metadata')"
         :icon="InformationCircleIcon"
     />

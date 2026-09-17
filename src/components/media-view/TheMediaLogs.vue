@@ -64,6 +64,14 @@
       </div>
     </div>
   </section>
+  <section class="py-4 px-8">
+    <div class="flex flex-wrap items-center gap-3">
+      <button class="btn btn-primary" :disabled="!logFile" @click="openLogFile">
+        {{ t('media.view.logs.openFile') }}
+      </button>
+      <span v-if="logFile" class="text-xs opacity-70 break-all font-mono">{{ logFile }}</span>
+    </div>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -74,6 +82,8 @@ import DiagnosticCard from './DiagnosticCard.vue';
 import { useI18n } from 'vue-i18n';
 import { useGroupLog } from '../../composables/useGroupLog';
 import { useLinkify } from '../../composables/useLinkify';
+import { useOpener } from '../../composables/useOpener';
+import { useTranscriptionStore } from '../../stores/transcription.ts';
 import { groupSkippedDiagnostics, isSkippedDiagnostic } from '../../helpers/skippedDiagnostics.ts';
 
 const { t } = useI18n();
@@ -86,6 +96,13 @@ const props = defineProps({
 const { groupId } = toRefs(props);
 
 const diagnosticsStore = useMediaDiagnosticsStore();
+const transcriptionStore = useTranscriptionStore();
+const { openPath } = useOpener();
+const logFile = computed(() => transcriptionStore.probe?.logFile);
+
+const openLogFile = async () => {
+  if (logFile.value) await openPath(logFile.value);
+};
 const groupLog = useGroupLog(groupId);
 const { linkify } = useLinkify();
 

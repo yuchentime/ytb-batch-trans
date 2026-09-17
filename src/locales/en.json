@@ -190,8 +190,14 @@
   "media": {
     "view": {
       "tabs": {
-        "metadata": "Metadata",
+        "en": "English",
+        "zh": "Chinese",
         "logs": "Logs"
+      },
+      "transcript": {
+        "openDirectory": "Open output folder",
+        "openFile": "Open with the default app",
+        "missing": "Not written yet."
       },
       "thumbnailAlt": "Thumbnail for {title}",
       "metadata": {
@@ -211,6 +217,7 @@
         "duration": "Duration"
       },
       "logs": {
+  "openFile": "Open log file",
         "failure": "Failure",
         "errors": {
           "count": "Errors ({count})",

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import type { RouteLocationNormalized } from 'vue-router';
 import HomeView from './views/app/HomeView.vue';
 import SetupView from './views/app/SetupView.vue';
 import MediaView from './views/app/MediaView.vue';
@@ -6,8 +7,8 @@ import SubtitleView from './views/app/SubtitleView.vue';
 import FullLayout from './layouts/FullLayout.vue';
 import AppLayout from './layouts/AppLayout.vue';
 import InstallView from './views/full/InstallView.vue';
-import TheMediaMetadata from './components/media-view/TheMediaMetadata.vue';
 import TheMediaLogs from './components/media-view/TheMediaLogs.vue';
+import TheTranscript from './components/media-view/TheTranscript.vue';
 import LocationView from './views/app/LocationView.vue';
 import SettingsView from './views/app/SettingsView.vue';
 import AuthenticationView from './views/app/AuthenticationView.vue';
@@ -132,17 +133,24 @@ const routes = [
         children: [
           {
             path: '',
-            name: 'group.metadata',
-            component: TheMediaMetadata,
-            props: true,
+            name: 'group.en',
+            component: TheTranscript,
+            props: (route: RouteLocationNormalized) => ({ groupId: route.params.groupId, kind: 'en' }),
             meta: { index: 0 },
+          },
+          {
+            path: 'zh',
+            name: 'group.zh',
+            component: TheTranscript,
+            props: (route: RouteLocationNormalized) => ({ groupId: route.params.groupId, kind: 'zh' }),
+            meta: { index: 1 },
           },
           {
             path: 'logs',
             name: 'group.logs',
             component: TheMediaLogs,
             props: true,
-            meta: { index: 1 },
+            meta: { index: 2 },
           },
         ],
       },
