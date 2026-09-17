@@ -243,6 +243,17 @@
         "progress": "{percentage}% — {done} of {total}",
         "progressLabel": "Fetching metadata…"
       },
+      "audioDownload": {
+        "indeterminate": "Downloading audio…"
+      },
+      "transcribe": {
+        "progress": "Transcribing chunk {index}/{total}",
+        "model": "Model: {model}"
+      },
+      "translate": {
+        "progress": "Translating block {index}/{total}",
+        "tokens": "Tokens: {prompt} in / {completion} out"
+      },
       "configure": {
         "format": {
           "trackSelect": {

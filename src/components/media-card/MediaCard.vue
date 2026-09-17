@@ -33,6 +33,9 @@ import { useMediaStore } from '../../stores/media/media';
 import { useMediaOptionsStore } from '../../stores/media/options';
 import FetchStep from './steps/FetchStep.vue';
 import FetchListStep from './steps/FetchListStep.vue';
+import AudioDownloadStep from './steps/AudioDownloadStep.vue';
+import TranscribeStep from './steps/TranscribeStep.vue';
+import TranslateStep from './steps/TranslateStep.vue';
 import MediaConfigureStep from './steps/MediaConfigureStep.vue';
 import MediaDownloadStep from './steps/MediaDownloadStep.vue';
 import MediaDoneStep from './steps/MediaDoneStep.vue';
@@ -53,6 +56,12 @@ const stepMap = {
   [MediaState.configure]: MediaConfigureStep,
   [MediaState.downloading]: MediaDownloadStep,
   [MediaState.downloadingList]: MediaDownloadListStep,
+  [MediaState.downloadingAudio]: AudioDownloadStep,
+  [MediaState.transcribing]: TranscribeStep,
+  [MediaState.translating]: TranslateStep,
+  // All paragraphs are translated when the pipeline enters `writing`; the card keeps
+  // showing the translation progress until the Chinese transcript is written.
+  [MediaState.writing]: TranslateStep,
   [MediaState.paused]: MediaPausedStep,
   [MediaState.pausedList]: MediaPausedListStep,
   [MediaState.done]: MediaDoneStep,

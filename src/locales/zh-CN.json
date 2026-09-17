@@ -243,6 +243,17 @@
         "progress": "{percentage}% — {done} / {total}",
         "progressLabel": "正在提取元数据…"
       },
+      "audioDownload": {
+        "indeterminate": "正在下载音频…"
+      },
+      "transcribe": {
+        "progress": "正在转录第 {index}/{total} 块",
+        "model": "模型：{model}"
+      },
+      "translate": {
+        "progress": "正在翻译第 {index}/{total} 块",
+        "tokens": "Token：输入 {prompt} / 输出 {completion}"
+      },
       "configure": {
         "format": {
           "trackSelect": {
