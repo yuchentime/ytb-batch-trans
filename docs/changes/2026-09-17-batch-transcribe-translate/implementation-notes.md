@@ -231,3 +231,35 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 - 尝试次数 = `maxRetries + 1`（`maxRetries` 为 2 时最多 3 次请求）；`with_base_delay(Duration::ZERO)` 是给 L1/L2 测试的接缝。
 - key 每次请求由调用方传入（L008 每块从 stronghold 读一次，不缓存），只写入 `Authorization: Bearer …` 头；`DeepseekClient` 不持有 key，也不记录任何请求/响应明文（只回传 `usage`）。
 - L1 用自建 `std::net::TcpListener` mock（无新 dev-dependency）覆盖：401 不重试、429 退避后成功、5xx 重试上限、契约失败重试/耗尽、请求体（`model`/`temperature=0.3`/`json_object`/system+user）与“key 只在头不在体”。真实 DeepSeek 调用属 Phase C L3（需真 key）。
+
+## 10. 流水线与产物的持久性事实（L008）
+
+### 10.1 模块与并发
+
+| 模块 | 职责 |
+| --- | --- |
+| `transcribe/artifacts.rs` | 原子写（`.tmp`→rename）、完整性/损坏判定、产物路径与目录名消毒、`source.json` 标记、`summary.md` 之外的 `.work` 读写（segments/zh.blocks）、组装 zh 原稿、用量合计 |
+| `scheduling/transcribe_pipeline.rs` | 批/视频编排、四阶段、事件、取消、限流、清理、批次汇总 |
+| `models/transcribe.rs` | IPC 载荷（stage/progress/artifact/batch_summary）与 `VideoStatus`/`VideoErrorCode`（与 design 错误码表逐字一致） |
+
+- 并发模型：`GenericDispatcher` 的信号量**直接复用 `DownloadLimiter`**（即“视频槽”，默认 2），因此“下载并发 ≤2”天然成立（每个视频在任一时刻只下一个音频）；视频内 whisper 用 `TranscribeLimiter`（固定 1）串行，翻译每个 block 取 `TranslateLimiter`（= `translation.concurrency`，启动时读取，与现有 `DownloadLimiter` 一样不支持热改）。
+- 阶段与产物：`downloadingAudio`（fetch 元数据 + 下载音频）→ `transcribing`（时长→切块→whisper→merge→写 `transcript.en.txt`）→ `translating`（逐 block，写 `zh.blocks.json`）→ `writing`（拼 `transcript.zh.txt` + 清理 `audio.*`）。成功发 `media_complete`，失败发 `media_fatal`（`internal=false`，`details=错误码`）。
+- 跳过/续跑：① 本地 `source.json` 命中两份 txt → 零网络跳过（AC-14，见 design.md 新增 Deviation）；② fetch 后若 `segments.json` 完整则复用（跳过 whisper）；③ 仅在“复用了转录且 `zh.blocks.json` 与当前 block 计划完全匹配”时才跳过翻译（重转录会作废旧译文）；`overwrite=true` 全部重跑。
+- 失败保留现场：任何失败/取消都不删音频、不删中间产物；只有两份 txt 都写成功后才按 `keepAudio` 决定是否删 `audio.*`（分块文件保留以便人工校对）。
+- 批次汇总：`register_batch` → 每个视频上报 `BatchSummaryItem`（状态/错误码/产物/跳过/用量）→ 最后一个上报时原子写 `<root>/summary.md`（表格 + Totals）并发 `batch_summary`，随后移除批状态（清理时机明确）。
+
+### 10.2 错误码映射（L1 单测覆盖）
+
+| 来源 | 映射 |
+| --- | --- |
+| `WhisperError::OutOfMemory` / `SpawnFailed` / 其余 | `whisperOutOfMemory` / `whisperMissing` / `whisperFailed` |
+| `FfmpegError::SpawnFailed` / 其余 | `ffmpegMissing` / `ffmpegChunkFailed`；`DurationUnknown` 由时长探测失败分支产生 |
+| `DeepseekError::AuthFailed`/`RateLimited`/`Timeout`/`InvalidResponse`/其余 | `deepseekAuthFailed`/`deepseekRateLimited`/`deepseekTimeout`/`translationContractViolation`/`deepseekServerError`（`RequestRejected` 也归 `deepseekServerError`） |
+| 本地写盘/元数据/下载 | `outputWriteFailed` / `fetchFailed` / `downloadFailed` |
+
+### 10.3 遗留与风险
+
+- **L2 未跑**：AC-15/16/19 的联动判定需要 fake whisper/ffmpeg + mock DeepSeek + 真实文件系统（Phase C 第 18 项）；本循环只到 L1 + 编译/clippy/fmt。
+- 跳过路径不发 `media_add`（卡片生成交给 L009 的命令响应 / Phase B）。
+- 同标题视频会落到同一目录（设计既有命名方案的固有风险），已有 `source.json` 可辅助识别但不解决冲突；如需要可在后续循环加目录后缀。
+- 流水线模块在 L009 接线前挂模块级 `#[allow(dead_code)]`，接线后必须删。
