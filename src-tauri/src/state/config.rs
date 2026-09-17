@@ -120,7 +120,7 @@ mod tests {
     "inputFilters": { "minSize": { "value": 10, "unit": "MB" } },
     "output": {
       "downloadDir": "D:/legacy-downloads",
-      "file_name_template": "legacy-%(title)s.%(ext)s",
+      "fileNameTemplate": "legacy-%(title)s.%(ext)s",
       "video": { "container": "mkv" }
     },
     "performance": { "autoLoadSize": false },
@@ -137,7 +137,10 @@ mod tests {
     // Known legacy values survive the deep merge.
     assert_eq!(config.appearance.theme, "dark");
     assert!(config.input.prefer_video_in_mixed_links);
-    assert_eq!(config.output.download_dir.as_deref(), Some("D:/legacy-downloads"));
+    assert_eq!(
+      config.output.download_dir.as_deref(),
+      Some("D:/legacy-downloads")
+    );
     assert_eq!(config.output.file_name_template, "legacy-%(title)s.%(ext)s");
 
     // Keys that no longer exist (or never existed) are ignored, not fatal.
@@ -159,9 +162,7 @@ mod tests {
     assert_eq!(config.output.download_dir.as_deref(), Some("D:/Downloads"));
     assert_eq!(
       config.output.root_dir.as_deref(),
-      Path::new("D:/Downloads")
-        .join(TRANSCRIPT_DIR_NAME)
-        .to_str()
+      Path::new("D:/Downloads").join(TRANSCRIPT_DIR_NAME).to_str()
     );
 
     let mut configured = Config::default();
@@ -170,6 +171,9 @@ mod tests {
     apply_path_defaults(&mut configured, PathBuf::from("D:/Downloads"));
 
     assert_eq!(configured.output.download_dir.as_deref(), Some("E:/keep"));
-    assert_eq!(configured.output.root_dir.as_deref(), Some("E:/keep/transcripts"));
+    assert_eq!(
+      configured.output.root_dir.as_deref(),
+      Some("E:/keep/transcripts")
+    );
   }
 }
