@@ -48,6 +48,7 @@ whisper --model tiny.en --device cuda --fp16 True  --language en --task transcri
 | `transcribe/{chunking,merge,transcript,artifacts}.rs` | transcribe-translate | `runners/template_context.rs` 的纯函数测试风格、`binaries_manager.rs` 的 `.tmp` → rename 模式 |
 | `translation/{blocks,validate,deepseek_client}.rs` | transcribe-translate | `reqwest`（已在 `Cargo.toml`）、`stronghold/stronghold_state.rs` |
 | `runners/ytdlp_args/audio_args.rs` | download-engine | 替代 `format_args.rs`/`output_args.rs`/`input_filter_args.rs`；沿用 `override_resolver.rs` 的三态合并 |
+| `runners/ytdlp_args/network_args.rs`、`auth_args.rs` | download-engine | 自 `ytdlp_runner.rs` 抽出的纯函数：runner 与新音频 argv 共用一份网络/认证构造（M1/M2 不双实现）；`normalize_extractor_args` 随之下移 |
 | `commands/media/media_size.rs`（删除） | media-queue | 需同步删除：`lib.rs` handler、白名单、`tests/utils/mocks/mediaHandlers.ts`、`src/stores/media/size.ts` |
 
 ## 3. 待实现清单中的易漏项（评审与核验产生）
