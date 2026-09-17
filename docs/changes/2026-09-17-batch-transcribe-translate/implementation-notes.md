@@ -374,7 +374,7 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 | 页签 | `settings` 改为 转录 / 翻译 / 输出 / 网络 / 系统 / 关于（默认 `settings.transcription`）；`SettingsDownloadsTab`/`SettingsAppTab` 删除，外观/通知/输入/更新并入系统页；顶栏设置链指向 `settings.transcription` |
 | 转录页 | `SettingsTranscription.vue`：model（small/medium/large-v3）、device（cuda/cpu）、fp16、language（en/auto）、chunkMinutes（0=不分块）、keepAudio、conditionOnPreviousText、whisperPath 覆盖 |
 | 翻译页 | `SettingsTranslation.vue`：`ai.apiKey`（password + 保存 + 已配置/未配置徽标）、baseUrl、model、temperature、concurrency、maxRetries、dropFillers、术语表 textarea |
-| API key 写入 | `stronghold` store 新增 `setAiApiKey(value)`：只写 `ai.apiKey`，**从不读回**（`getValues` 仍只覆盖 auth 字段）；“是否已配置”由 `transcription_probe.apiKeyConfigured` 展示，保存后重跑 probe 刷新 |
+| API key 写入 | `stronghold` store 新增 `setAiApiKey(value)`：只写 `ai.apiKey`，**从不读回**（`getValues` 仍只覆盖 auth 字段）；“是否已配置”由 `transcription_probe.apiKeyConfigured` 展示，保存后重跑 probe 刷新；写入前若 vault 未解锁先 `loadStatus` → `stronghold_init`（全新安装没有 `vault.hold`，启动自动解锁不会发生，否则直接写会报 `vault locked`） |
 | 输出页 | `SettingsOutput.vue` 重写为 rootDir / overwrite / restrictFilenames（旧的 video/audio/模板/后处理字段不再展示） |
 | i18n | `settings.tabs`/`settings.transcription`/`settings.translation`/`settings.output` 已补 `en` + `zh-CN`；其余 11 种语言暂缺（vue-i18n 回退 en，翻译补齐属后续收尾） |
 | 删除 | `SettingsDownloadsTab.vue`/`SettingsAppTab.vue`；`tests/unit/postprocessSettings.spec.ts`/`postprocessOverrides.spec.ts`（针对已移除的后处理 UI） |
