@@ -30,7 +30,7 @@ export interface StrongholdFields {
 }
 
 export const useStrongholdStore = defineStore('stronghold', () => {
-  const status = ref<StrongholdStatus>(defaultStrongholdStatus);
+  const status = ref<StrongholdStatus>({ ...defaultStrongholdStatus });
   const availableKeys = ref<number[][]>([]);
 
   async function loadStatus(): Promise<StrongholdStatus> {
@@ -95,6 +95,15 @@ export const useStrongholdStore = defineStore('stronghold', () => {
 
   /** Writes the DeepSeek key; it is never read back into the UI (presence shows via the probe). */
   async function setAiApiKey(value: string): Promise<void> {
+    // A fresh install has no snapshot yet, so the startup auto-unlock leaves the vault
+    // locked; create it here (same as the auth page's "Enable") before writing.
+    if (!status.value.unlocked) {
+      await loadStatus();
+    }
+    if (!status.value.unlocked) {
+      await initialize();
+    }
+
     const encoder = new TextEncoder();
     await invoke('stronghold_set', {
       entries: { 'ai.apiKey': Array.from(encoder.encode(value)) },
