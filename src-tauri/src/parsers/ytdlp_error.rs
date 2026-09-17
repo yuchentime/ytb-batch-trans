@@ -141,10 +141,9 @@ impl YtdlpErrorParser {
 
     let (level, rest) = if let Some(msg) = trimmed.strip_prefix("ERROR:") {
       (DiagnosticLevel::Error, msg.trim())
-    } else if let Some(msg) = trimmed.strip_prefix("WARNING:") {
-      (DiagnosticLevel::Warning, msg.trim())
     } else {
-      return None;
+      let msg = trimmed.strip_prefix("WARNING:")?;
+      (DiagnosticLevel::Warning, msg.trim())
     };
 
     let (component, rest) = split_component(rest);
