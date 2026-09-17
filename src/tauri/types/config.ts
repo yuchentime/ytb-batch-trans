@@ -100,9 +100,11 @@ export interface OutputSettings {
   preciseCuts: boolean;
   reversePlaylistNumbering: boolean;
   downloadDir: string | null;
+  rootDir: string | null;
   fileNameTemplate: string;
   audioFileNameTemplate: string;
   restrictFilenames: boolean;
+  overwrite: boolean;
 }
 
 export interface PerformanceSettings {
@@ -117,6 +119,49 @@ export interface SubtitleSettings {
   languages: string[];
   formatPreference: string[];
   embedSubtitles: boolean;
+}
+
+export enum TranscriptionModel {
+  small = 'small',
+  medium = 'medium',
+  largeV3 = 'large-v3',
+}
+
+export enum TranscriptionDevice {
+  cuda = 'cuda',
+  cpu = 'cpu',
+}
+
+export enum TranscriptionLanguage {
+  en = 'en',
+  auto = 'auto',
+}
+
+export interface TranscriptionSettings {
+  model: TranscriptionModel;
+  device: TranscriptionDevice;
+  fp16: boolean;
+  language: TranscriptionLanguage;
+  chunkMinutes: number;
+  keepAudio: boolean;
+  whisperPath: string | null;
+  conditionOnPreviousText: boolean;
+}
+
+export interface TranslationSettings {
+  baseUrl: string;
+  model: string;
+  temperature: number;
+  concurrency: number;
+  maxRetries: number;
+  maxSegmentsPerBlock: number;
+  maxCharsPerBlock: number;
+  glossary: string;
+  dropFillers: boolean;
+}
+
+export interface LoggingSettings {
+  verbose: boolean;
 }
 
 export interface SponsorBlockSettings {
@@ -163,6 +208,9 @@ export interface Settings {
   performance: PerformanceSettings;
   sponsorBlock: SponsorBlockSettings;
   subtitles: SubtitleSettings;
+  transcription: TranscriptionSettings;
+  translation: TranslationSettings;
+  logging: LoggingSettings;
   update: UpdateSettings;
   system: SystemSettings;
   notifications: NotificationSettings;
@@ -236,9 +284,11 @@ export const defaultOutputSettings: OutputSettings = {
   preciseCuts: false,
   reversePlaylistNumbering: false,
   downloadDir: null,
+  rootDir: null,
   fileNameTemplate: '%(title).200s-(%(height)sp%(fps).0d).%(ext)s',
   audioFileNameTemplate: '%(title).200s-(%(abr)dk).%(ext)s',
   restrictFilenames: false,
+  overwrite: false,
 };
 
 export const defaultPerformanceSettings: PerformanceSettings = {
@@ -253,6 +303,33 @@ export const defaultSubtitleSettings: SubtitleSettings = {
   languages: ['en'],
   formatPreference: [...DEFAULT_SUBTITLE_FORMAT_ORDER],
   embedSubtitles: true,
+};
+
+export const defaultTranscriptionSettings: TranscriptionSettings = {
+  model: TranscriptionModel.small,
+  device: TranscriptionDevice.cuda,
+  fp16: true,
+  language: TranscriptionLanguage.en,
+  chunkMinutes: 20,
+  keepAudio: false,
+  whisperPath: null,
+  conditionOnPreviousText: false,
+};
+
+export const defaultTranslationSettings: TranslationSettings = {
+  baseUrl: 'https://api.deepseek.com',
+  model: 'deepseek-chat',
+  temperature: 0.3,
+  concurrency: 2,
+  maxRetries: 2,
+  maxSegmentsPerBlock: 6,
+  maxCharsPerBlock: 3000,
+  glossary: '',
+  dropFillers: true,
+};
+
+export const defaultLoggingSettings: LoggingSettings = {
+  verbose: false,
 };
 
 export const defaultSponsorBlockSettings: SponsorBlockSettings = {
@@ -301,6 +378,9 @@ export const defaultSettings: Settings = {
     languages: [...defaultSubtitleSettings.languages],
     formatPreference: [...defaultSubtitleSettings.formatPreference],
   },
+  transcription: { ...defaultTranscriptionSettings },
+  translation: { ...defaultTranslationSettings },
+  logging: { ...defaultLoggingSettings },
   update: defaultUpdateSettings,
   system: defaultSystemSettings,
   notifications: defaultNotificationSettings,

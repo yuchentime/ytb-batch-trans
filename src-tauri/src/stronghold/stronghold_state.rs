@@ -11,6 +11,53 @@ pub const CLIENT: &[u8] = b"ovd";
 const KR_SERVICE: &str = "com.jelleglebbeek.youtube-dl-gui";
 const KR_ACCOUNT: &str = "master_key";
 
+/// Stronghold key of the DeepSeek API key. The five existing auth keys keep their exact
+/// names and semantics (M1); this one is only read by the translation client (AC-12).
+///
+/// `dead_code` is allowed until the DeepSeek client (Phase A, L003) consumes this API;
+/// the attributes below disappear with that wiring.
+#[allow(dead_code)]
+pub const AI_API_KEY: &str = "ai.apiKey";
+
+/// Wrapper for the DeepSeek API key that deliberately implements neither `Debug` nor `Display`
+/// (nor `Serialize`), so the secret cannot leak into logs, IPC events or the config store by
+/// accident (AC-12). Use [`ApiKey::expose`] only when building the `Authorization` header.
+#[allow(dead_code)]
+#[derive(Clone, PartialEq, Eq)]
+pub struct ApiKey(Vec<u8>);
+
+#[allow(dead_code)]
+impl ApiKey {
+  pub fn new(bytes: Vec<u8>) -> Self {
+    Self(bytes)
+  }
+
+  /// Byte view for the request header. Never pass the result to a formatter.
+  pub fn expose(&self) -> &[u8] {
+    &self.0
+  }
+}
+
+impl Drop for ApiKey {
+  fn drop(&mut self) {
+    self.0.fill(0);
+  }
+}
+
+/// Trims a raw stronghold value and treats blank values as "not configured".
+#[allow(dead_code)]
+fn api_key_from_raw(raw: Option<Vec<u8>>) -> Result<Option<ApiKey>, String> {
+  let Some(bytes) = raw else {
+    return Ok(None);
+  };
+  let text = String::from_utf8(bytes).map_err(|e| e.to_string())?;
+  let trimmed = text.trim();
+  if trimmed.is_empty() {
+    return Ok(None);
+  }
+  Ok(Some(ApiKey::new(trimmed.as_bytes().to_vec())))
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct AuthSecrets {
   pub username: Option<String>,
@@ -84,6 +131,22 @@ impl StrongholdState {
       bearer_token,
       headers,
     })
+  }
+
+  /// Reads the DeepSeek API key from the vault. Returns `Ok(None)` when unset/blank; the
+  /// caller must not format the returned value (AC-12).
+  #[allow(dead_code)]
+  pub fn load_ai_api_key(&self) -> Result<Option<ApiKey>, String> {
+    let guard = self
+      .inner
+      .lock()
+      .map_err(|_| "failed to lock stronghold".to_string())?;
+    let sh = guard.as_ref().ok_or_else(|| "vault locked".to_string())?;
+    let raw = sh
+      .store()
+      .get(AI_API_KEY.as_bytes())
+      .map_err(|e| e.to_string())?;
+    api_key_from_raw(raw)
   }
 }
 
@@ -163,4 +226,36 @@ fn create_and_store_new(app: &AppHandle, state: &State<StrongholdState>) -> Resu
     .set_password(KR_SERVICE, KR_ACCOUNT, &b64)
     .map_err(|e| format!("failed to save key to keyring: {e}"))?;
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn ai_api_key_name_is_stable() {
+    // Stable contract: `stronghold_set` writes this name and the translation client reads it.
+    assert_eq!(AI_API_KEY, "ai.apiKey");
+    // The five auth keys must stay untouched (M1).
+    assert_ne!(AI_API_KEY, "auth.bearer");
+  }
+
+  #[test]
+  fn api_key_from_raw_trims_and_blank_is_missing() {
+    assert!(api_key_from_raw(None).expect("none is valid").is_none());
+    assert!(api_key_from_raw(Some(Vec::new()))
+      .expect("empty is valid")
+      .is_none());
+    assert!(api_key_from_raw(Some(b"  \n\t ".to_vec()))
+      .expect("blank is valid")
+      .is_none());
+  }
+
+  #[test]
+  fn api_key_from_raw_keeps_trimmed_secret() {
+    let key = api_key_from_raw(Some(b"  sk-test-DO-NOT-LEAK\n".to_vec()))
+      .expect("utf-8 is valid")
+      .expect("non-blank is configured");
+    assert_eq!(key.expose(), b"sk-test-DO-NOT-LEAK");
+  }
 }

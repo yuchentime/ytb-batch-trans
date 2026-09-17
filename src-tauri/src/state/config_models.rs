@@ -184,9 +184,11 @@ pub struct OutputSettings {
   pub precise_cuts: bool,
   pub reverse_playlist_numbering: bool,
   pub download_dir: Option<String>,
+  pub root_dir: Option<String>,
   pub file_name_template: String,
   pub audio_file_name_template: String,
   pub restrict_filenames: bool,
+  pub overwrite: bool,
 }
 
 impl Default for OutputSettings {
@@ -200,9 +202,13 @@ impl Default for OutputSettings {
       precise_cuts: false,
       reverse_playlist_numbering: false,
       download_dir: None,
+      // Filled in `Config::before_initialized` from the host download dir; the
+      // environment-dependent default must stay out of `Default` (AC-18).
+      root_dir: None,
       file_name_template: "%(title).200s-(%(height)sp%(fps).0d).%(ext)s".into(),
       audio_file_name_template: "%(title).200s-(%(abr)dk).%(ext)s".into(),
       restrict_filenames: false,
+      overwrite: false,
     }
   }
 }
@@ -261,6 +267,101 @@ impl Default for SubtitleSettings {
       ],
     }
   }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TranscriptionModel {
+  #[default]
+  Small,
+  Medium,
+  #[serde(rename = "large-v3")]
+  LargeV3,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TranscriptionDevice {
+  #[default]
+  Cuda,
+  Cpu,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TranscriptionLanguage {
+  #[default]
+  En,
+  Auto,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct TranscriptionSettings {
+  pub model: TranscriptionModel,
+  pub device: TranscriptionDevice,
+  pub fp16: bool,
+  pub language: TranscriptionLanguage,
+  /// Split the audio into fixed-size chunks; `0` keeps a single chunk.
+  pub chunk_minutes: u32,
+  pub keep_audio: bool,
+  /// Manual override for the whisper executable; `None` resolves from `PATH`.
+  pub whisper_path: Option<String>,
+  pub condition_on_previous_text: bool,
+}
+
+impl Default for TranscriptionSettings {
+  fn default() -> Self {
+    Self {
+      model: TranscriptionModel::Small,
+      device: TranscriptionDevice::Cuda,
+      fp16: true,
+      language: TranscriptionLanguage::En,
+      chunk_minutes: 20,
+      keep_audio: false,
+      whisper_path: None,
+      condition_on_previous_text: false,
+    }
+  }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct TranslationSettings {
+  pub base_url: String,
+  pub model: String,
+  pub temperature: f32,
+  pub concurrency: usize,
+  pub max_retries: u32,
+  pub max_segments_per_block: u32,
+  pub max_chars_per_block: u32,
+  /// Plain text glossary, one `source=target` pair per line (cut C6).
+  pub glossary: String,
+  pub drop_fillers: bool,
+}
+
+impl Default for TranslationSettings {
+  fn default() -> Self {
+    Self {
+      base_url: "https://api.deepseek.com".into(),
+      model: "deepseek-chat".into(),
+      temperature: 0.3,
+      concurrency: 2,
+      max_retries: 2,
+      max_segments_per_block: 6,
+      max_chars_per_block: 3000,
+      glossary: String::new(),
+      drop_fillers: true,
+    }
+  }
+}
+
+/// File-log switches (design §8). Path and rotation stay fixed, not configurable.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct LoggingSettings {
+  /// When true the raw per-line output of yt-dlp/whisper/ffmpeg is also written to the file.
+  pub verbose: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -365,6 +466,9 @@ pub struct Config {
   pub performance: PerformanceSettings,
   pub sponsor_block: SponsorBlockSettings,
   pub subtitles: SubtitleSettings,
+  pub transcription: TranscriptionSettings,
+  pub translation: TranslationSettings,
+  pub logging: LoggingSettings,
   pub update: UpdateSettings,
   pub system: SystemConfig,
   pub notifications: NotificationConfig,
