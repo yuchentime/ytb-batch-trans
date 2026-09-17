@@ -636,6 +636,18 @@ fn playlist_children(parent: &TranscribeEntry, entries: &[PlaylistEntry]) -> Vec
     .collect()
 }
 
+/// Chunk file name for one cut. Chunks are produced with `-c copy`, so the container
+/// must match the source stream: yt-dlp often delivers webm/opus, which ffmpeg cannot
+/// mux into `.m4a` (`Could not find tag for codec opus in stream #0`).
+fn chunk_file_name(audio: &Path, index: usize) -> String {
+  let extension = audio
+    .extension()
+    .and_then(|ext| ext.to_str())
+    .filter(|ext| !ext.is_empty())
+    .unwrap_or("m4a");
+  format!("audio.{index:03}.{extension}")
+}
+
 fn set_stage(app: &AppHandle, entry: &TranscribeEntry, stage: TranscribeStage) {
   tracing::info!(
     event = events::STAGE_CHANGE,
@@ -990,7 +1002,7 @@ async fn transcribe_segments(
     }
 
     let _permit = transcribe_slot.acquire_owned().await;
-    let chunk_path = outputs.chunks.join(format!("audio.{:03}.m4a", chunk.index));
+    let chunk_path = outputs.chunks.join(chunk_file_name(audio, chunk.index));
 
     if let Err(error) = cut_chunk(
       Path::new("ffmpeg"),
@@ -1712,6 +1724,22 @@ mod tests {
     let summary = fs::read_to_string(root.join(SUMMARY_FILE_NAME)).expect("summary written");
     assert!(summary.contains("2 videos, 2 done"));
     let _ = fs::remove_dir_all(&root);
+  }
+
+  #[test]
+  fn chunk_files_reuse_the_source_container() {
+    assert_eq!(
+      chunk_file_name(Path::new("/w/.work/audio.webm"), 0),
+      "audio.000.webm"
+    );
+    assert_eq!(
+      chunk_file_name(Path::new("/w/.work/audio.m4a"), 12),
+      "audio.012.m4a"
+    );
+    assert_eq!(
+      chunk_file_name(Path::new("/w/.work/audio"), 3),
+      "audio.003.m4a"
+    );
   }
 
   #[test]
