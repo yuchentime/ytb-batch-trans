@@ -1,13 +1,13 @@
 // Port-check harness for the Rust pure logic added in L003/L004/L005.
 //
-// The machine that produced this change has no Rust toolchain, so `cargo test` cannot run.
-// This script mirrors the Rust functions line by line (whisper segment parsing + argv,
-// ffprobe duration parsing, chunk-cut argv, chunk planning, segment merging, mechanical
-// transcript paragraphing, log formatting/redaction/limits, the size-rotating writer) and
-// executes them against adversarial inputs on a real filesystem, so the algorithms can at
-// least be falsified. Development aid, not part of CI.
+// Historical note: these modules were mirrored while the machine had no Rust toolchain.
+// L006 installed the full toolchain, so `cargo test` is now the authority and new modules
+// are no longer mirrored here (see docs/changes/2026-09-17-batch-transcribe-translate/
+// implementation-notes.md §7.4). The checks below stay as an independent semantic
+// cross-check of the L003-L005 algorithms, executed against adversarial inputs on a real
+// filesystem. Development aid, not part of CI.
 //
-// Mirrored files (keep in sync when the Rust changes):
+// Mirrored files (frozen; keep in sync only if one of these files changes):
 //   src-tauri/src/runners/whisper_runner.rs
 //   src-tauri/src/runners/ffmpeg_runner.rs
 //   src-tauri/src/transcribe/chunking.rs
