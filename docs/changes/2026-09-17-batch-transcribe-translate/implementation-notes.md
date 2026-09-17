@@ -136,4 +136,4 @@ whisper --model tiny.en --device cuda --fp16 True  --language en --task transcri
 - Rust 工具链可用后必须补跑：`cargo fmt --all`、`cargo clippy --all-targets -- -D warnings`、`cargo test`；
   并复核 L001 中为“尚未接线的 API”加的 `#[allow(dead_code)]`（工具链到位、DeepSeek client 接线后应移除）。
 - 无 cargo 时，关键纯逻辑可用一次性 Node 端口脚本做**语义**校验（把函数逐行照搬 + 真实文件系统 + 对抗输入；L004 用它发现并修复了 `parse_clock_component` 接受 `inf`/`NaN`/负数、`end < start` 未拒绝两个真实缺口，并把 U+2028/U+2029 纳入折叠）。
-  注意：端口证明算法语义，**不能**替代 Rust 编译/运行验证；脚本为一次性校验产物，不随仓库交付。
+  注意：端口证明算法语义，**不能**替代 Rust 编译/运行验证；脚本已随仓库交付为 `scripts/port-checks.mjs`（`node scripts/port-checks.mjs`，当前 21/21；开发校验工具，不参与 CI，改动对应 Rust 逻辑时需同步）。
