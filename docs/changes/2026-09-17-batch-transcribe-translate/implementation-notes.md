@@ -126,14 +126,20 @@ whisper --model tiny.en --device cuda --fp16 True  --language en --task transcri
 - AC-21–AC-27：长链路日志文件（2026-09-17 追加）。
 - 后续若再追加 AC，从 AC-28 继续，**不得重编号**已确认的 AC。
 
-## 7. 本机验证环境缺口（2026-09-17 实测）
+## 7. 本机验证环境缺口与本地替代通道（2026-09-17 实测，L005 更新）
 
 - 本机 PATH、`~/.cargo`、scoop 与常见安装位置均无 `cargo`/`rustc`/`rustup`：
-  **`cargo fmt` / `cargo clippy` / `cargo test` 当前无法执行**。
-- 因此 Rust 侧验证按 worklog 契约标 `[quarantined: 缺少 Rust 工具链]`；不伪造通过，也不得把前端结果当作 Rust 已验证。
+  **项目级 `cargo fmt` / `cargo clippy` / `cargo test` 仍无法执行**（缺 cargo、依赖源码与 MSVC 链接库）。
+- 因此整仓 Rust 验证按 worklog 契约标 `[quarantined: 缺少 Rust 工具链]`；不伪造通过，也不得把前端结果当作 Rust 已验证。
 - 前端可验证部分照常执行：`npm run lint:fix`、`npm run test:unit`、`npm run test:e2e`
   （本机需先 `npx playwright install chromium`，否则 21 条用例全部因缺浏览器启动失败）、`npm run build`（含 `vue-tsc --noEmit`）。
 - Rust 工具链可用后必须补跑：`cargo fmt --all`、`cargo clippy --all-targets -- -D warnings`、`cargo test`；
   并复核 L001 中为“尚未接线的 API”加的 `#[allow(dead_code)]`（工具链到位、DeepSeek client 接线后应移除）。
-- 无 cargo 时，关键纯逻辑可用一次性 Node 端口脚本做**语义**校验（把函数逐行照搬 + 真实文件系统 + 对抗输入；L004 用它发现并修复了 `parse_clock_component` 接受 `inf`/`NaN`/负数、`end < start` 未拒绝两个真实缺口，并把 U+2028/U+2029 纳入折叠）。
-  注意：端口证明算法语义，**不能**替代 Rust 编译/运行验证；脚本已随仓库交付为 `scripts/port-checks.mjs`（`node scripts/port-checks.mjs`，当前 21/21；开发校验工具，不参与 CI，改动对应 Rust 逻辑时需同步）。
+- 无 cargo 时，关键纯逻辑先用一次性 Node 端口脚本做**语义**校验（把函数逐行照搬 + 真实文件系统 + 对抗输入；L004 用它发现并修复了 `parse_clock_component` 接受 `inf`/`NaN`/负数、`end < start` 未拒绝两个真实缺口，并把 U+2028/U+2029 纳入折叠）。
+  注意：端口证明算法语义，**不能**替代 Rust 编译/运行验证；脚本已随仓库交付为 `scripts/port-checks.mjs`（`node scripts/port-checks.mjs`，当前 44/44，L005 增补 `plan_chunks`/`merge_segments`/`format_english_transcript` 三组；开发校验工具，不参与 CI，改动对应 Rust 逻辑时需同步）。
+- **L005 实测的本地替代通道：无 cargo 也能跑真 rustfmt/rustc/clippy/std-only 单测**。用 npm 上由官方构建（commit `42212a5c4`，2025-02-27）打包的 Rust 组件搭临时 sysroot：
+  - 组件（`npm install --prefix <tmp>`）：`@rustbin/rustc-beta-x86_64-pc-windows-msvc@1.86.0-beta.3`（内含 `rustc_driver-<hash>.dll`）、`@rustbin/rustfmt-beta-x86_64-pc-windows-msvc@1.8.0-beta.3`、`@rustbin/clippy-beta-x86_64-pc-windows-msvc@0.1.86-beta.3`、`@rustbin/rust-std-beta-wasm32-wasip1@1.86.0-beta.3`。
+  - 组装（仅临时目录）：rustc 组件目录当 sysroot；`rustfmt.exe`、`clippy-driver.exe` 复制进 sysroot 的 `bin/`；wasm std 复制进 `lib/rustlib/wasm32-wasip1/`。
+  - 命令：`rustfmt --check <files>`（自动读取 `src-tauri/rustfmt.toml`）；对只依赖 std 的模块建独立 crate（`mod transcribe;` + 复制模块），`rustc --edition 2021 --test --target wasm32-wasip1 --crate-name <name> src/lib.rs -o tests.wasm` 后用 `node:wasi`（`preview1`）跑（L005：35/35 通过）；`clippy-driver … -o out.wasm -D warnings`（L005：0 warning）。
+  - 边界：npm 渠道的 beta 官方二进制，只覆盖 std-only 模块，**不替代**整仓 `cargo fmt/clippy/test`，也不进 CI；主机构建仍缺 MSVC 链接库。
+  - 顺带发现（需后续清理循环处理）：整仓 `rustfmt --check` 在 L001–L004 的 5 个文件仍有 11 处格式偏差：`logging/file_log.rs`(5)、`state/config.rs`(3)、`runners/whisper_runner.rs`(1)、`runners/ytdlp_process.rs`(1)、`runners/ytdlp_args/tests.rs`(1)；需跑 `cargo fmt --all`。
