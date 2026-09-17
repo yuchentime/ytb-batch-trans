@@ -7,7 +7,7 @@ canonical_for:
 related:
   - docs/current/shared/testing-strategy.md
   - docs/current/rules/coding.rules.md
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # 构建、测试与静态检查
@@ -77,6 +77,7 @@ last_verified: 2026-09-17
 - Rust 构建/测试需要系统库（Linux 上 `glib-2.0`、`webkit2gtk` 等，见 `.github/actions/install-tauri-deps`）；
   缺失时 `cargo test`/`cargo clippy` 会因构建失败而无法运行（本仓库的 AGENTS.md 已记录该限制）。
 - E2E 需要 Playwright 浏览器：`npx playwright install --with-deps`。
+- Windows 本地跑 `npm run tauri dev` 必须在“最小 PATH + vcvars64”环境里（JDK 的 `api-ms-win-*.dll` shim 会遮蔽系统 DLL、Git 的 `link.exe` 会与 MSVC 链接器重名，导致链接失败或进程启动即 `STATUS_ENTRYPOINT_NOT_FOUND`）：仓库提供 `scripts/dev.cmd`，它从当前 PATH 发现并保留 cargo/node/python/ffmpeg 目录，再引入 MSVC 环境，用法 `scripts\dev.cmd npm run tauri dev`。
 - `cargo test` 不能替代真实下载验证（无网络与真实 yt-dlp）。
 
 ## Boundaries

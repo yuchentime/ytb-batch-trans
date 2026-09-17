@@ -149,6 +149,8 @@ rustc 需要 MSVC 的 `link.exe`，且直接跑会遇到两个本机特有的坑
 System32、`%USERPROFILE%\.cargo\bin`、Git cmd）→ `call vcvars64.bat` → `%*`。
 所有 cargo 命令通过 `cmd /c "…\msvc.cmd cargo …"` 执行（`MSYS_NO_PATHCONV=1`）。
 
+`tauri dev` 用同样的最小环境，但还必须能找到 node/python/ffmpeg，因此仓库新增 `scripts/dev.cmd`（L010 后补）：先用 `%%~dp$PATH:i` 从当前 PATH 发现 `node.exe`/`python.exe`/`ffmpeg.exe` 目录，再套用最小 PATH + `vcvars64.bat`（经 `vswhere` 定位 VS）；用法 `scripts\dev.cmd npm run tauri dev`。⚠️ 用系统 PATH 直跑会把 JDK shim 与 Git `link.exe` 带进来，必须走包装。
+
 另一个 Windows 专属编译修复已入库：`src-tauri/build.rs` 注入 comctl32 v6 manifest
 （依赖树静态导入 `TaskDialogIndirect`，缺 manifest 时链接出的测试/主程序会在 `main` 前崩溃）。
 
