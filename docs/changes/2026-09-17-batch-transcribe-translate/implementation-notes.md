@@ -203,3 +203,31 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 
 - **YouTube 现行下载要求**：yt-dlp 2026.07 起对 YouTube 需 JS runtime + EJS 求解脚本，否则 403；`--remote-components ejs:github` 会在运行时从 GitHub 取脚本，与“远端内容必须签名校验”的架构规则冲突，需在 L008/Phase C 前定方案（签名清单分发 JS runtime+求解脚本 / 依赖用户 Cookie / 固定可用 client）。
 - 干跑产物留在 `E:\tmp\ytb-e2e\`（`transcript_chunked.txt`、`transcript_whole.txt`、各块 JSON/stdout/stderr），未进入仓库；应用级 L3 验收仍需等 L006–L009 + Phase B。
+
+## 9. 翻译模块的持久性事实（L007）
+
+### 9.1 分块与 prompt（`translation/blocks.rs`）
+
+- `plan_blocks`：连续段落成块，上限 `maxSegmentsPerBlock`（默认 6）且 `maxCharsPerBlock`（默认 3000）；**段落永不切分**（Q6 的 1:1 对齐），超长段独占一块；配置为 `0` 时钳为 `1`，不会产生空块/无限块。
+- `parse_glossary`：每行首个 `=` 分割，两侧 trim 后均非空才采纳；空行/无 `=`/空边一律跳过（不报错）。
+- prompt 全部集中在 `blocks.rs`：`build_system_prompt`（角色 + 硬规则 + `dropFillers` 决定是否加去填充词条目 + 术语表 + JSON 输出契约）与 `build_user_prompt`（前 2 段的“原文 + 已产出译文”上下文 + `[id] text` 列表）。response id = 全局段落索引（0-based），与 `zh.blocks.json` 的 id 一致。
+
+### 9.2 校验与数字保真（`translation/validate.rs`）
+
+- 契约顺序：先查 id 集合（缺 id → `MissingId`，多余 → `UnexpectedId`），再查数量（重复 id 导致数量不符 → `WrongItemCount`），最后逐位查顺序与 `zh.trim()` 非空；任一项不过 → `translationContractViolation`，不落盘。`TranslationItem` 用 `deny_unknown_fields`，模型额外添加的字段/说明文本会在反序列化阶段就被拒绝。
+- `extract_numbers` 保留数字、数字间 `.`/`,` 与尾随 `%`（`2,024`、`3.5%`）；保真比对先归一化（去空格、`,` 千分位、`％`→`%`），再做**数字边界**检查（`190%` 不会满足 `90%`）；命中术语表映射（源词含该数字且译文用了术语表译文）也算通过。只告警，不影响落盘。
+
+### 9.3 HTTP 与重试（`translation/deepseek_client.rs`）
+
+| 情形 | 行为 |
+| --- | --- |
+| 401 / 403 | `AuthFailed`，不重试（`deepseekAuthFailed`） |
+| 429 | 退避后重试：优先 `Retry-After`（秒，封顶 60s），否则指数退避（1s 起、每次翻倍、封顶 8s） |
+| 5xx | `ServerError { status }`，可重试（`deepseekServerError`） |
+| 其它 4xx | `RequestRejected { status }`，不重试（错误码由 L008 决定，候选 `deepseekServerError`） |
+| 超时（120s）/ 网络 | `Timeout` / `Network`，可重试 |
+| 响应 JSON 或契约不符 | `InvalidResponse`，可重试（模型下次可能给出正确 JSON） |
+
+- 尝试次数 = `maxRetries + 1`（`maxRetries` 为 2 时最多 3 次请求）；`with_base_delay(Duration::ZERO)` 是给 L1/L2 测试的接缝。
+- key 每次请求由调用方传入（L008 每块从 stronghold 读一次，不缓存），只写入 `Authorization: Bearer …` 头；`DeepseekClient` 不持有 key，也不记录任何请求/响应明文（只回传 `usage`）。
+- L1 用自建 `std::net::TcpListener` mock（无新 dev-dependency）覆盖：401 不重试、429 退避后成功、5xx 重试上限、契约失败重试/耗尽、请求体（`model`/`temperature=0.3`/`json_object`/system+user）与“key 只在头不在体”。真实 DeepSeek 调用属 Phase C L3（需真 key）。
