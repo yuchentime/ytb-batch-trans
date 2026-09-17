@@ -379,3 +379,14 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 | i18n | `settings.tabs`/`settings.transcription`/`settings.translation`/`settings.output` 已补 `en` + `zh-CN`；其余 11 种语言暂缺（vue-i18n 回退 en，翻译补齐属后续收尾） |
 | 删除 | `SettingsDownloadsTab.vue`/`SettingsAppTab.vue`；`tests/unit/postprocessSettings.spec.ts`/`postprocessOverrides.spec.ts`（针对已移除的后处理 UI） |
 | 测试 | `settingsView.spec.ts` 改为新页签 + 用转录页复选框验证 save/reset；`header.spec.ts` 路由名同步 |
+
+## 17. 详情页三 tab 与打开产物（L015）
+
+| 维度 | 决定 |
+| --- | --- |
+| 路由 | `group.metadata` 移除，改为 `group.en`（默认）/ `group.zh` / `group.logs`（`TheTranscript` 通过 `props: (route) => ({ groupId, kind })` 区分） |
+| 文稿 tab | `TheTranscript.vue`：展示 `artifactsFor(首个 item).{en,zh}` 路径 + “打开输出目录”（openPath 目录）+ “用系统程序打开”（openPath 文件）；未落盘时显示空态；**不做内嵌预览**（裁剪 C4，无 `artifacts_read`） |
+| 日志 tab | 保留内存诊断/日志流；新增“打开日志文件”按钮，路径来自 `transcription_probe.logFile`（AC-27）；前端不读日志内容 |
+| 卡片入口 | `MediaCardActions` 的信息按钮从 `group.metadata` 改指 `group.en` |
+| i18n | `media.view.tabs.{en,zh}`、`media.view.transcript.*`、`media.view.logs.openFile` 补 `en`+`zh-CN` |
+| 测试 | 新增 `theTranscript.spec.ts`（路径展示 + 两个 opener 调用 + 未生成空态） |
