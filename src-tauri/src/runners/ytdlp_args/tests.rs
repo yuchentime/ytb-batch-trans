@@ -951,7 +951,10 @@ fn audio_download_args_are_audio_only_and_merge_overrides() {
   assert_eq!(args[4], "--no-playlist");
   assert!(has_pair("--proxy", "http://127.0.0.1:8080"));
   assert!(has_pair("--impersonate", "chrome"));
-  assert!(has_pair("--extractor-args", "youtube:player_js_variant=main"));
+  assert!(has_pair(
+    "--extractor-args",
+    "youtube:player_js_variant=main"
+  ));
   assert!(has_pair("--cookies-from-browser", "firefox"));
   assert!(has_pair("--cookies", "/tmp/cookies.txt"));
   assert!(has_pair("--username", "user"));

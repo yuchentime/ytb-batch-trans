@@ -205,7 +205,8 @@ pub fn spawn_piped(
     .stdin(Stdio::piped())
     .stdout(Stdio::piped())
     .stderr(Stdio::piped());
-  configure_command(&mut command).map_err(|error| format!("process spawn setup failed: {error}"))?;
+  configure_command(&mut command)
+    .map_err(|error| format!("process spawn setup failed: {error}"))?;
 
   let mut raw_child = command
     .spawn()
