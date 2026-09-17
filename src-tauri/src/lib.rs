@@ -11,6 +11,7 @@ mod scheduling;
 mod state;
 mod stronghold;
 mod transcribe;
+mod translation;
 mod tray;
 mod window;
 
