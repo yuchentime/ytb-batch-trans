@@ -1,6 +1,3 @@
-// `audio_args` is wired into the transcribe pipeline in the next loop; until then its public
-// surface would be reported as dead code. Drop the allowance with the wiring (Phase A, L003).
-#[allow(dead_code)]
 mod audio_args;
 mod auth_args;
 mod format_args;

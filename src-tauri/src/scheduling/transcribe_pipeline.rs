@@ -28,9 +28,10 @@ use crate::scheduling::group_state::subscribe_group;
 use crate::state::config_models::Config;
 use crate::stronghold::stronghold_state::StrongholdState;
 use crate::transcribe::artifacts::{
-  assemble_zh_transcript, find_audio_file, find_existing_output, load_segments, load_zh_blocks,
-  store_segments, store_source_marker, store_zh_blocks, total_usage, write_atomic,
-  BlockTranslation, OutputPaths, SourceMarker, SUMMARY_FILE_NAME,
+  assemble_zh_transcript, file_is_non_empty, find_audio_file, find_existing_output, load_segments,
+  load_zh_blocks, plan_skips, store_segments, store_source_marker, store_zh_blocks, total_usage,
+  write_atomic, zh_blocks_complete, ArtifactState, BlockTranslation, OutputPaths, SourceMarker,
+  SUMMARY_FILE_NAME,
 };
 use crate::transcribe::chunking::plan_chunks;
 use crate::transcribe::merge::{merge_segments, ChunkSegments, MergedSegment, Segment};
@@ -498,6 +499,20 @@ fn is_cancelled(cancel: &watch::Receiver<bool>) -> bool {
   !*cancel.borrow()
 }
 
+/// Logs `audio.download.fail` (AC-24) and returns the stage failure.
+fn audio_download_failed(entry: &TranscribeEntry, exit: Option<i32>, message: &str) -> JobError {
+  tracing::error!(
+    event = events::AUDIO_DOWNLOAD_FAIL,
+    run = %entry.batch_id,
+    group = %entry.group_id,
+    url = %entry.url,
+    exit = format!("{exit:?}"),
+    errCode = VideoErrorCode::DownloadFailed.as_str(),
+    error = %message,
+  );
+  JobError::failed(VideoErrorCode::DownloadFailed, message)
+}
+
 type StageResult = Result<(usize, bool, Usage), JobError>;
 
 /// Shared per-video inputs for the stage helpers (keeps argument counts small).
@@ -534,8 +549,8 @@ async fn run_stages(
     return Err(JobError::Cancelled);
   }
 
-  let segments_reused = !cfg.output.overwrite && load_segments(&outputs.segments).is_some();
-  let segments = if segments_reused {
+  let segments_complete = !cfg.output.overwrite && load_segments(&outputs.segments).is_some();
+  let segments = if segments_complete {
     load_segments(&outputs.segments).expect("checked above")
   } else {
     transcribe_segments(&ctx, &audio, metadata_duration, outputs, cancel).await?
@@ -552,6 +567,27 @@ async fn run_stages(
   }
 
   let transcript = format_english_transcript(&segments);
+  let plan = plan_blocks(&transcript.paragraphs, &cfg.translation);
+  let mut blocks = load_zh_blocks(&outputs.zh_blocks).unwrap_or_default();
+  let skips = plan_skips(
+    ArtifactState {
+      en_exists: file_is_non_empty(&outputs.en),
+      zh_exists: file_is_non_empty(&outputs.zh),
+      segments_complete,
+      blocks_complete: zh_blocks_complete(&blocks, &plan),
+    },
+    cfg.output.overwrite,
+  );
+  if skips.skip_all {
+    tracing::info!(
+      event = events::VIDEO_SKIP,
+      run = %entry.batch_id,
+      group = %entry.group_id,
+      reason = "exists",
+    );
+    return Ok((segments.len(), true, total_usage(&blocks)));
+  }
+
   if let Err(error) = write_atomic(&outputs.en, &transcript.text) {
     return Err(JobError::failed(VideoErrorCode::OutputWriteFailed, error));
   }
@@ -571,12 +607,7 @@ async fn run_stages(
     return Err(JobError::Cancelled);
   }
 
-  let plan = plan_blocks(&transcript.paragraphs, &cfg.translation);
-  let mut blocks = load_zh_blocks(&outputs.zh_blocks).unwrap_or_default();
-  let blocks_complete = crate::transcribe::artifacts::zh_blocks_complete(&blocks, &plan);
-  let skip_translation = segments_reused && blocks_complete && !cfg.output.overwrite;
-
-  if !skip_translation {
+  if !skips.skip_translation {
     translate_blocks(
       &ctx,
       outputs,
@@ -653,12 +684,9 @@ async fn download_audio(
   );
 
   let runner = YtdlpRunner::new(app).with_args(args).with_url(&entry.url);
-  let (mut rx, child) = runner.spawn().map_err(|error| {
-    JobError::failed(
-      VideoErrorCode::DownloadFailed,
-      format!("spawn yt-dlp: {error}"),
-    )
-  })?;
+  let (mut rx, child) = runner
+    .spawn()
+    .map_err(|error| audio_download_failed(entry, None, &format!("spawn yt-dlp: {error}")))?;
 
   let verbose = cfg.logging.verbose;
   let exit_code;
@@ -671,7 +699,7 @@ async fn download_audio(
     tokio::select! {
       event = rx.recv() => {
         let Some(event) = event else {
-          return Err(JobError::failed(VideoErrorCode::DownloadFailed, "yt-dlp event stream ended"));
+          return Err(audio_download_failed(entry, None, "yt-dlp event stream ended"));
         };
         match event {
           ProcessEvent::Stdout(line) => {
@@ -687,7 +715,7 @@ async fn download_audio(
             break;
           }
           ProcessEvent::Error(error) => {
-            return Err(JobError::failed(VideoErrorCode::DownloadFailed, error));
+            return Err(audio_download_failed(entry, None, &error));
           }
         }
       }
@@ -701,18 +729,15 @@ async fn download_audio(
   }
 
   if exit_code != Some(0) {
-    return Err(JobError::failed(
-      VideoErrorCode::DownloadFailed,
-      format!("yt-dlp exited with code {exit_code:?}"),
+    return Err(audio_download_failed(
+      entry,
+      exit_code,
+      &format!("yt-dlp exited with code {exit_code:?}"),
     ));
   }
 
-  let audio = find_audio_file(&outputs.work).ok_or_else(|| {
-    JobError::failed(
-      VideoErrorCode::DownloadFailed,
-      "yt-dlp produced no audio file",
-    )
-  })?;
+  let audio = find_audio_file(&outputs.work)
+    .ok_or_else(|| audio_download_failed(entry, exit_code, "yt-dlp produced no audio file"))?;
   tracing::info!(
     event = events::AUDIO_DOWNLOAD_OK,
     run = %entry.batch_id,

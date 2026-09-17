@@ -290,7 +290,6 @@ fn send_line(tx: &UnboundedSender<ProcessEvent>, is_stdout: bool, buf: &mut Vec<
 }
 
 #[derive(Debug, Default)]
-#[allow(dead_code)] // Consumed by the transcribe pipeline (L008); remove with the wiring.
 pub struct ProcessResult {
   pub code: Option<i32>,
   pub stdout: String,
@@ -305,7 +304,6 @@ pub struct ProcessResult {
 /// `cancel` is the group-state watch channel: a `true` value kills the process tree and
 /// returns a cancelled result (AC-16). Callers must also check the initial value before
 /// calling, because a value that was already `true` never produces a change.
-#[allow(dead_code)] // Consumed by the transcribe pipeline (L008); remove with the wiring.
 pub async fn run_streaming<F, G>(
   command: Command,
   mut cancel: watch::Receiver<bool>,
@@ -375,7 +373,6 @@ where
 }
 
 /// Joins the last `count` lines of a captured stderr into a single message-safe excerpt.
-#[allow(dead_code)] // Consumed by the runners (L004); remove with the wiring.
 pub fn tail_excerpt(lines: &[String], count: usize) -> String {
   let start = lines.len().saturating_sub(count);
   lines[start..].join(" | ")

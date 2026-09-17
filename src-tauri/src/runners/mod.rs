@@ -1,9 +1,6 @@
+pub mod ffmpeg_runner;
 pub mod override_resolver;
 pub mod template_context;
-// Consumed by the transcribe pipeline (L008); remove the allowances with the wiring.
-#[allow(dead_code)]
-pub mod ffmpeg_runner;
-#[allow(dead_code)]
 pub mod whisper_runner;
 pub mod ytdlp_args;
 pub mod ytdlp_download;

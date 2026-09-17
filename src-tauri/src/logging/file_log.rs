@@ -40,7 +40,6 @@ pub const RESPONSE_MAX_CHARS: usize = 500;
 pub const STDERR_MAX_CHARS: usize = 2048;
 /// Hard safety cap for any other field; full URLs must survive (W008 decision A).
 pub const FIELD_MAX_CHARS: usize = 8192;
-#[allow(dead_code)] // Consumed by the runners (verbose raw output) in the next loops.
 pub const TOOL_LINE_MAX_CHARS: usize = 2048;
 
 const SENSITIVE_FIELD_NAMES: &[&str] = &[
@@ -68,12 +67,10 @@ pub fn log_dir(app_dir: &Path) -> PathBuf {
   app_dir.join(LOG_DIR_NAME)
 }
 
-#[allow(dead_code)] // Returned by `transcription_probe` (AC-27) in the next loops.
 pub fn log_file_path(app_dir: &Path) -> PathBuf {
   log_dir(app_dir).join(LOG_FILE_NAME)
 }
 
-#[allow(dead_code)] // Returned by `transcription_probe` (AC-27) in the next loops.
 pub fn log_size_bytes(app_dir: &Path) -> u64 {
   match fs::metadata(log_file_path(app_dir)) {
     Ok(metadata) => metadata.len(),
@@ -137,12 +134,6 @@ pub fn truncate_chars(value: &str, max_chars: usize) -> String {
   out
 }
 
-#[allow(dead_code)] // Consumed by the pipeline when recording titles.
-pub fn sanitize_title(value: &str) -> String {
-  truncate_chars(&sanitize_field(value), TITLE_MAX_CHARS)
-}
-
-#[allow(dead_code)] // Consumed by the runners and the DeepSeek client for excerpts.
 pub fn sanitize_excerpt(value: &str, max_chars: usize) -> String {
   truncate_chars(&sanitize_field(value), max_chars)
 }
@@ -162,7 +153,6 @@ fn field_limit(name: &str) -> usize {
 }
 
 /// Emits one raw tool line; only written when `logging.verbose` is on.
-#[allow(dead_code)] // Consumed by the runners in the next loops.
 pub fn log_tool_output(verbose: bool, tool: &str, line: &str) {
   if !verbose {
     return;

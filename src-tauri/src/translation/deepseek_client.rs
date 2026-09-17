@@ -7,6 +7,7 @@
 //! supplied per request and only ever written into the `Authorization` header; it is never
 //! logged or formatted (AC-12).
 
+use crate::logging::events;
 use crate::state::config_models::TranslationSettings;
 use crate::stronghold::stronghold_state::ApiKey;
 use serde::{Deserialize, Serialize};
@@ -129,6 +130,7 @@ impl DeepseekClient {
   }
 
   /// Test/E2E seam: a zero delay keeps the retry tests fast.
+  #[allow(dead_code)] // Permanent seam for L1/L2 tests; production uses the default backoff.
   pub fn with_base_delay(mut self, base_delay: Duration) -> Self {
     self.base_delay = base_delay;
     self
@@ -175,6 +177,12 @@ impl DeepseekClient {
           if !error.is_retryable() || attempt >= self.settings.max_retries {
             return Err(error);
           }
+          tracing::warn!(
+            event = events::TRANSLATE_BLOCK_RETRY,
+            block = block.index,
+            attempt = attempt + 1,
+            status = %error,
+          );
           tokio::time::sleep(retry_delay(attempt, retry_after, self.base_delay)).await;
           attempt += 1;
         }

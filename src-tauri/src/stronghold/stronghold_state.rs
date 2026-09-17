@@ -13,20 +13,14 @@ const KR_ACCOUNT: &str = "master_key";
 
 /// Stronghold key of the DeepSeek API key. The five existing auth keys keep their exact
 /// names and semantics (M1); this one is only read by the translation client (AC-12).
-///
-/// `dead_code` is allowed until the DeepSeek client (Phase A, L003) consumes this API;
-/// the attributes below disappear with that wiring.
-#[allow(dead_code)]
 pub const AI_API_KEY: &str = "ai.apiKey";
 
 /// Wrapper for the DeepSeek API key that deliberately implements neither `Debug` nor `Display`
 /// (nor `Serialize`), so the secret cannot leak into logs, IPC events or the config store by
 /// accident (AC-12). Use [`ApiKey::expose`] only when building the `Authorization` header.
-#[allow(dead_code)]
 #[derive(Clone, PartialEq, Eq)]
 pub struct ApiKey(Vec<u8>);
 
-#[allow(dead_code)]
 impl ApiKey {
   pub fn new(bytes: Vec<u8>) -> Self {
     Self(bytes)
@@ -45,7 +39,6 @@ impl Drop for ApiKey {
 }
 
 /// Trims a raw stronghold value and treats blank values as "not configured".
-#[allow(dead_code)]
 fn api_key_from_raw(raw: Option<Vec<u8>>) -> Result<Option<ApiKey>, String> {
   let Some(bytes) = raw else {
     return Ok(None);
@@ -135,7 +128,6 @@ impl StrongholdState {
 
   /// Reads the DeepSeek API key from the vault. Returns `Ok(None)` when unset/blank; the
   /// caller must not format the returned value (AC-12).
-  #[allow(dead_code)]
   pub fn load_ai_api_key(&self) -> Result<Option<ApiKey>, String> {
     let guard = self
       .inner
@@ -180,7 +172,6 @@ pub fn init(app: &AppHandle, state: &State<StrongholdState>) -> Result<(), Strin
   create_and_store_new(app, state)
 }
 
-#[allow(dead_code)]
 pub fn init_on_startup(app: &AppHandle, state: &State<StrongholdState>) {
   if !state.snapshot_path.exists() {
     return;
