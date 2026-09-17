@@ -413,3 +413,17 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 - 根因：切块 `-c copy` 输出名固定 `.m4a`，而该视频 bestaudio 是 webm/opus，mp4/ipod 容器不支持 opus。
 - 修复：`chunk_file_name(audio, index)` 复用源文件扩展名（无扩展名回退 `m4a`）；whisper 的 JSON 路径按 file_stem 推导，无需改动。
 - 回归测试：`chunk_files_reuse_the_source_container`（webm / m4a / 无扩展名）。
+
+## 21. L3 真机 E2E（2026-09-18）：nIABz0Z4IRA 全链路通过
+
+- 驱动方式：应用自身的全局快捷键（Windows：`Alt+Shift+V` = 从剪贴板入队）+ 真实 `transcribe_start`；不是 mock、不是我手点界面。
+- 结果：`run=57f3056d-b0f4-4d45-a43a-695fa44bf3ae`，01:32:21 → 01:34:17 约 116s，`run.end done=1 failed=0 skipped=0`。
+- 事件链：`run.start → duration.resolved(502.000) → chunk.plan(1) → chunk.cut.ok → whisper.start → whisper.ok(179 segs, 56.7s, small/cuda) → merge.ok(covered=502.000) → transcript.en.ok → 5× translate.block.start/ok → transcript.zh.ok → cleanup.ok → video.done → run.end`；无 fidelity/retry/warn/error。
+- 产物：`<root>/How to Learn So Fast People Assume You're Naturally Gifted/transcript.en.txt`（27 段 / 8836 chars）与 `transcript.zh.txt`（27 段 / 2718 chars，2375 个汉字；与原文段落 **1:1**）；`<root>/summary.md` 记 `done` 与 tokens `4276/12785`。
+- 过程修复（各自独立提交）：取消语义 `693a0f1`、stronghold client store `1607c05`、切块容器 `4a10901`；另见 §22 的快捷键修复。
+- 遗留：`.work/chunks/audio.000.m4a` 是修复前失败运行留下的 0 字节残file（无害、不被使用）；`.work/audio.webm` 已被 `cleanup.ok` 按 `keepAudio=false` 删除。
+- 注意：`summary.md` 写在输出根目录（不是单个视频目录内）；翻译模型 `deepseek-flash` 实测可用。
+
+## 22. 全局快捷键改接转录入队（2026-09-18）
+
+`src/tauri/listeners/shortcuts.ts` 的 `media_add` / `media_add_and_download` 在 L013 改入口时被遗漏，仍调用已废弃的下载流程（`dispatchMediaInfoFetch` / `addAndDownload`）。现在两者都走 `mediaStore.startTranscriptionBatch([url])`；`download_all` 动作已无对应功能，移除该分支。它也是 §21 的 L3 E2E 驱动方式。
