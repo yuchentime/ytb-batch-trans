@@ -321,3 +321,23 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 ### 12.4 `group_cancel` 清理
 
 `commands/group/group_cancel.rs` 现在也向 `TranscribeSender` 发 `DispatchRequest::Cleanup`，与 fetch/download 一致：取消后移除 `RUNNING_GROUPS` 分组并清掉排队条目（不改运行中任务的取消语义）。
+
+## 13. Phase B 前端基础（L011）
+
+### 13.1 `transcription` store（`src/stores/transcription.ts`）
+
+| 维度 | 决定 |
+| --- | --- |
+| 职责 | 仅会话内（不持久化）：probe 结果、逐 item 阶段、块/翻译进度、artifact 路径、token 用量、批次汇总 |
+| 阶段→状态 | `transcribe_stage` 经 `stageStates` 映射到 `MediaState.{downloadingAudio,transcribing,translating,writing}` 并写入 `media-state` store（与下载进度同一模式，进度驱动状态） |
+| 进度 | `transcribe_progress` → `chunkProgress[id]`（percent 钳 0..100）；`translate_progress` → `blockProgress[id]` + 累计 `usage[id]`；`usageForGroup` 经 group store 聚合 |
+| 产物/汇总 | `artifact_written` 按 `kind` 合并 `{en, zh}`；`batch_summary` 追加到 `summaries`，`latestSummary` 取最后一条 |
+| 清理 | `forgetItem(id)`（删除分组时用）与 `reset()`；五个监听在 `src/tauri/listeners/transcription.ts`，注册于 `plugins/tauriListeners.ts` |
+
+### 13.2 卡片步骤（Phase B 第 11 项增量）
+
+- `MediaState` 新增 `downloadingAudio`/`transcribing`/`translating`/`writing`（`configure` 暂留，删除随第 13 项的首页输入改线，避免下载入口先失效）。
+- 新组件：`AudioDownloadStep`（indeterminate，音频下载无字节级进度）、`TranscribeStep`（整体百分比 = 块内 percent 折算 + 当前模型）、`TranslateStep`（块完成度 + 累计 token）。
+- `MediaCard.vue` 的 `stepMap` 接入四态；`writing` 复用 `TranslateStep`（design 的步骤清单没有 Writing 组件）。
+- i18n：`media.steps.{audioDownload,transcribe,translate}` 已补 `en` 与 `zh-CN`，其余语言留给第 17 项。
+- 步骤组件按 group 的第一个 item 读取进度；playlist group 拆分（第 13 项）后即为 1:1。
