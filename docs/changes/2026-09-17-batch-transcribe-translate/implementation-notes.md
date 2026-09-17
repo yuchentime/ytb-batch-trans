@@ -391,3 +391,11 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 | 卡片入口 | `MediaCardActions` 的信息按钮从 `group.metadata` 改指 `group.en` |
 | i18n | `media.view.tabs.{en,zh}`、`media.view.transcript.*`、`media.view.logs.openFile` 补 `en`+`zh-CN` |
 | 测试 | 新增 `theTranscript.spec.ts`（路径展示 + 两个 opener 调用 + 未生成空态） |
+
+## 18. `run_streaming` 取消语义修复（2026-09-18）
+
+- 症状：处理视频报 `ffmpegChunkFailed: cancelled`；yt-dlp 元数据已提供时长（跳过 ffprobe），第一条 `run_streaming` 就是 ffmpeg 切块。
+- 根因：`runners/ytdlp_process.rs::run_streaming` 把 group watch 的值理解反了——`group_state` 约定是 `true=运行中 / false=已取消`（管线上 `is_cancelled = !*borrow()`），但它初始检查写成 `if *borrow() { cancelled }`，且 `changed()` 分支不看新值、任何变化都 kill。于是每次调用都立即返回 cancelled。
+- 修复：初始检查改为 `if !*borrow()`；`changed()` 仅在值变为 `false` 时杀进程树并返回 cancelled，冗余 `true` 通知继续等待，sender 被 drop（分组清理）后改为只排空进程输出。
+- 连带：`transcribe_pipeline` 把 `FfmpegError::Cancelled` 从 `probe_duration`/`cut_chunk` 显式映射为 `JobError::Cancelled`（真取消不再记成视频失败/错误码）。
+- 回归测试：新增 3 条 `run_streaming` 单测（已取消不 spawn、运行中正常跑完、翻转为 `false` 杀进程树）。
