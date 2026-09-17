@@ -49,6 +49,7 @@ whisper --model tiny.en --device cuda --fp16 True  --language en --task transcri
 | `translation/{blocks,validate,deepseek_client}.rs` | transcribe-translate | `reqwest`（已在 `Cargo.toml`）、`stronghold/stronghold_state.rs` |
 | `runners/ytdlp_args/audio_args.rs` | download-engine | 替代 `format_args.rs`/`output_args.rs`/`input_filter_args.rs`；沿用 `override_resolver.rs` 的三态合并 |
 | `runners/ytdlp_args/network_args.rs`、`auth_args.rs` | download-engine | 自 `ytdlp_runner.rs` 抽出的纯函数：runner 与新音频 argv 共用一份网络/认证构造（M1/M2 不双实现）；`normalize_extractor_args` 随之下移 |
+| `runners/ytdlp_process.rs`（扩展） | 进程基础设施 | 新增 `spawn_piped`/`ProcessEvent`/`PipedProcess`/`run_streaming`/`prepend_bin_dir_to_path`/`tail_excerpt`；`ytdlp_runner` 原 spawn/reader 代码下沉到这里，whisper/ffmpeg runner 复用同一封装（W001 的关闭依据） |
 | `commands/media/media_size.rs`（删除） | media-queue | 需同步删除：`lib.rs` handler、白名单、`tests/utils/mocks/mediaHandlers.ts`、`src/stores/media/size.ts` |
 
 ## 3. 待实现清单中的易漏项（评审与核验产生）
@@ -134,3 +135,5 @@ whisper --model tiny.en --device cuda --fp16 True  --language en --task transcri
   （本机需先 `npx playwright install chromium`，否则 21 条用例全部因缺浏览器启动失败）、`npm run build`（含 `vue-tsc --noEmit`）。
 - Rust 工具链可用后必须补跑：`cargo fmt --all`、`cargo clippy --all-targets -- -D warnings`、`cargo test`；
   并复核 L001 中为“尚未接线的 API”加的 `#[allow(dead_code)]`（工具链到位、DeepSeek client 接线后应移除）。
+- 无 cargo 时，关键纯逻辑可用一次性 Node 端口脚本做**语义**校验（把函数逐行照搬 + 真实文件系统 + 对抗输入；L004 用它发现并修复了 `parse_clock_component` 接受 `inf`/`NaN`/负数、`end < start` 未拒绝两个真实缺口，并把 U+2028/U+2029 纳入折叠）。
+  注意：端口证明算法语义，**不能**替代 Rust 编译/运行验证；脚本为一次性校验产物，不随仓库交付。

@@ -452,7 +452,8 @@ L3 覆盖真实 whisper GPU 转录（含 stdout 进度契约与 OOM 路径）、
 
 | 偏差 | 发现于 | 与设计不符之处 | 处理（改设计 / 改现状文档 / 接受） |
 |---|---|---|---|
-| 文件日志写入器：同步自研 `SizeRotatingFile` 取代 `tracing-appender` 非阻塞 writer | L003（2026-09-17） | §8 与 Alternatives 选定 `tracing-appender` 滚动 non-blocking writer；但其 `Rotation` 仅支持时间维度（`MINUTELY`/`HOURLY`/`DAILY`/`NEVER`），无法实现 AC-25 要求的“单文件 5MB、保留 5 个”体积上限，size-rotation 必须自研。既然 writer 自研，非阻塞包装只增加一个依赖与 guard 生命周期，而每行一次 `write(2)`（无 fsync）不会明显阻塞流水线 | **接受（待开发者确认）**：改为 `tracing` fmt 层 + 自研 `SizeRotatingFile`（同步、逐行单次写、5MB×5），不新增依赖。若坚持非阻塞，后续把 writer 包一层 `non_blocking` 即可（约 3 行）；需先由 cargo 刷新 `Cargo.lock` |
+| 文件日志写入器：同步自研 `SizeRotatingFile` 取代 `tracing-appender` 非阻塞 writer | L003（2026-09-17） | §8 与 Alternatives 选定 `tracing-appender` 滚动 non-blocking writer；但其 `Rotation` 仅支持时间维度（`MINUTELY`/`HOURLY`/`DAILY`/`NEVER`），无法实现 AC-25 要求的“单文件 5MB、保留 5 个”体积上限，size-rotation 必须自研。既然 writer 自研，非阻塞包装只增加一个依赖与 guard 生命周期，而每行一次 `write(2)`（无 fsync）不会明显阻塞流水线 | **接受（开发者 2026-09-17 确认）**：改为 `tracing` fmt 层 + 自研 `SizeRotatingFile`（同步、逐行单次写、5MB×5），不新增依赖。若坚持非阻塞，后续把 writer 包一层 `non_blocking` 即可（约 3 行）；需先由 cargo 刷新 `Cargo.lock` |
+| ffmpeg 切块用 `-t <duration>` 而非 `-to <end>` | L004（2026-09-17） | §3 与关键节点表写 `ffmpeg -ss <start> -to <end> -c copy`；输入 `-ss` 与 `-to` 组合时，`-to` 的相对时间轴随 ffmpeg 版本不同（相对 seek 点或文件起点），会切错块长 | 接受：`-ss <start> -i <in> -t <end-start> -c copy <out>`（`-t` 语义无歧义）；块边界仍由 `plan_chunks` 的 `[start, end]` 决定 |
 
 ## Version History
 
