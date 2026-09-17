@@ -375,7 +375,7 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 | 转录页 | `SettingsTranscription.vue`：model（small/medium/large-v3）、device（cuda/cpu）、fp16、language（en/auto）、chunkMinutes（0=不分块）、keepAudio、conditionOnPreviousText、whisperPath 覆盖 |
 | 翻译页 | `SettingsTranslation.vue`：`ai.apiKey`（password + 保存 + 已配置/未配置徽标）、baseUrl、model、temperature、concurrency、maxRetries、dropFillers、术语表 textarea |
 | API key 写入 | `stronghold` store 新增 `setAiApiKey(value: string \| null)`：只写/删 `ai.apiKey`（`null` 删除），**从不读回**（`getValues` 仍只覆盖 auth 字段）；“是否已配置”由 `transcription_probe.apiKeyConfigured` + 本次会话的保存标记展示，保存后重跑 probe 刷新；写入前若 vault 未解锁先 `loadStatus` → `stronghold_init`（全新安装没有 `vault.hold`，启动自动解锁不会发生，否则直接写会报 `vault locked`） |
-| 保存反馈 | 密钥随设置页统一的「保存」写入保险库（无独立保存/清除按钮、无状态徽标）；写入成功后 toast「设置已保存」并清空输入；待写入期间输入框下方提示“点击保存写入保险库” |
+| 保存反馈 | 密钥随设置页统一的「保存」写入保险库（无独立保存/清除按钮、无状态徽标）；**保存后保留输入框内容**（密码框遮罩），只是把 dirty 标记清零，避免“保存像丢数据”；写入成功后 toast「设置已保存」并刷新 probe；待写入期间输入框下方提示点击保存 |
 | 输出页 | `SettingsOutput.vue` 重写为 rootDir / overwrite / restrictFilenames（旧的 video/audio/模板/后处理字段不再展示） |
 | i18n | `settings.tabs`/`settings.transcription`/`settings.translation`/`settings.output` 已补 `en` + `zh-CN`；其余 11 种语言暂缺（vue-i18n 回退 en，翻译补齐属后续收尾） |
 | 删除 | `SettingsDownloadsTab.vue`/`SettingsAppTab.vue`；`tests/unit/postprocessSettings.spec.ts`/`postprocessOverrides.spec.ts`（针对已移除的后处理 UI） |
