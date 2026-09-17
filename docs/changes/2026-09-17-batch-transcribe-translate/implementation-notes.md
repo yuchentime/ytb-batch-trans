@@ -354,3 +354,15 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 | mock | `tests/utils/mocks/transcriptionHandlers.ts`（`readyProbe` + `transcription_probe` handler），注册进 `main.ts` 的 E2E mock 组合 |
 | 测试 | store：`runProbe` 调用与 `isEnvironmentReady` 门禁（含 whisper 缺失）；E2E：`tests/e2e/setup.spec.ts` 断言 probe 渲染；`header.spec.ts` 补 `setup` 路由 |
 | 未做（L013） | 首页输入仍是 `media_info`/下载向 `addUrlBatch*`；`transcribe_start` 接线、`configure`/`MediaConfigureStep` 删除、下载向 E2E 退场留到 L013（与流程替换同轮，避免入口空缺） |
+
+## 15. 首页输入改接转录链路（L013）
+
+| 维度 | 决定 |
+| --- | --- |
+| 入队 | `media` store 新增 `startTranscriptionBatch(urls)`：invoke `transcribe_start` → 每个返回的 groupId 建一个 `transcribeMode` group（含一个占位 item）+ `fetching` 状态；`TheHeader`（输入/剪贴板/文件导入）统一走它，shift-click 的“立即下载”语义删除 |
+| 事件接线 | `media_add` 仍走 `processMediaAddPayload`：`transcribeMode` 下 leader 只记录播放列表元数据并停在 `fetching`（不触发选择 UI）；子项集齐（`processed === total`）→ `splitTranscribedGroup` 用现有 `splitGroup` 按 URL/条目顺序拆成“一视频一卡片”，并继承 `transcribeMode` |
+| 阶段 | `transcribe_stage` 由 `transcription` store 映射到 `MediaState.{downloadingAudio,transcribing,translating,writing}`（L011），卡片步骤随之切换 |
+| 跳过路径 | 跳过时后端不发 `media_add`（AC-14 本地判定）；`processMediaCompletePayload` 在 `payload.id` 不属于该 group 时把 group 的占位 leader 置为 `done` |
+| 卡片动作 | `transcribeMode` 卡片隐藏下载/暂停/恢复，只保留删除（后端 `group_cancel`）、外链、错误重试（`retryTranscriptionGroup` 重建批次）；metadata 入口保留 |
+| 测试 | 单测 `transcriptionFlow.spec.ts`（批次创建 + 播放列表拆分）、`header.spec.ts`（输入 → `startTranscriptionBatch`、环境门禁禁用按钮 + 提交跳 `/setup`）；E2E `transcribe-flow.spec.ts`（add → 转录/翻译步骤与 token）；下载向 E2E 退场：删除 `download-progress`/`global-selection`/`group-behaviour`/`playlist-selection`/`persist-selection`/`queue-actions` 六个 spec（对应 UI 属第 16 项删除范围） |
+| 未做 | `configure`/`MediaConfigureStep` 与下载向 helpers/组件/单测的物理删除留到第 16 项（同一删除面）；`media_info`/`media_playlist_expand` 命令仍在后端但前端已无入口 |
