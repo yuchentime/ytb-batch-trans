@@ -172,24 +172,41 @@ pub fn chunk_json_path(chunk: &Path, output_dir: &Path) -> PathBuf {
     .file_stem()
     .map(|stem| stem.to_os_string())
     .unwrap_or_default();
-  output_dir.join(stem).with_extension("json")
+  // Append instead of `with_extension`: for `audio.000.m4a` that would treat `.000` as the
+  // extension and produce `audio.json`.
+  let mut file_name = stem;
+  file_name.push(".json");
+  output_dir.join(file_name)
+}
+
+/// Inputs for one `whisper` invocation. Grouped into a struct so the async entry point
+/// stays under the argument-count lint while keeping the two stream callbacks explicit.
+pub struct WhisperChunkRequest<'a> {
+  /// whisper executable (or shim) to run.
+  pub program: &'a Path,
+  /// Toolchain directory prepended to `PATH` (whisper shells out to ffmpeg).
+  pub bin_dir: &'a Path,
+  pub settings: &'a TranscriptionSettings,
+  /// Chunk to transcribe; the JSON output is named after its file stem.
+  pub chunk: &'a Path,
+  pub output_dir: &'a Path,
 }
 
 pub async fn transcribe_chunk(
-  program: &Path,
-  bin_dir: &Path,
-  settings: &TranscriptionSettings,
-  chunk: &Path,
-  output_dir: &Path,
+  request: &WhisperChunkRequest<'_>,
   cancel: watch::Receiver<bool>,
   mut on_segment: impl FnMut(WhisperSegment),
   mut on_stderr_line: impl FnMut(&str),
 ) -> Result<PathBuf, WhisperError> {
-  let json_path = chunk_json_path(chunk, output_dir);
+  let json_path = chunk_json_path(request.chunk, request.output_dir);
 
-  let mut command = Command::new(program);
-  command.args(whisper_args(settings, chunk, output_dir));
-  prepend_bin_dir_to_path(&mut command, bin_dir);
+  let mut command = Command::new(request.program);
+  command.args(whisper_args(
+    request.settings,
+    request.chunk,
+    request.output_dir,
+  ));
+  prepend_bin_dir_to_path(&mut command, request.bin_dir);
 
   let result = run_streaming(
     command,
@@ -289,8 +306,8 @@ mod tests {
 
   #[test]
   fn parses_whisper_stdout_segment_lines() {
-    let segment = parse_segment_line("[00:01:02.500 --> 00:01:05.000]  Hello world")
-      .expect("segment line");
+    let segment =
+      parse_segment_line("[00:01:02.500 --> 00:01:05.000]  Hello world").expect("segment line");
 
     assert_eq!(segment.start, 62.5);
     assert_eq!(segment.end, 65.0);
