@@ -23,7 +23,7 @@ use tracing_subscriber::filter::{LevelFilter, Targets};
 use tracing_subscriber::fmt::format::{FormatFields, Writer};
 use tracing_subscriber::fmt::time::{FormatTime, LocalTime};
 use tracing_subscriber::fmt::{FmtContext, FormatEvent, MakeWriter};
-use tracing_subscriber::registry::{LookupSpan, Registry};
+use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::Layer;
 
 pub const LOG_DIR_NAME: &str = "logs";
@@ -182,13 +182,15 @@ pub fn log_tool_output(verbose: bool, tool: &str, line: &str) {
 
 /// Formats one event per line: `<ISO8601 local> | <LEVEL> | <event> | run=… group=… stage=… k=v …`.
 pub struct FileLogFormat {
-  timer: LocalTime,
+  // Trait object so the concrete `LocalTime<F>` format type (from the transitive `time`
+  // crate) does not have to be named here.
+  timer: Box<dyn FormatTime + Send + Sync>,
 }
 
 impl FileLogFormat {
   pub fn new() -> Self {
     Self {
-      timer: LocalTime::rfc_3339(),
+      timer: Box::new(LocalTime::rfc_3339()),
     }
   }
 }
@@ -373,7 +375,9 @@ struct RotatingState {
 }
 
 fn lock_state(state: &Mutex<RotatingState>) -> MutexGuard<'_, RotatingState> {
-  state.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+  state
+    .lock()
+    .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 impl RotatingState {
@@ -422,7 +426,10 @@ impl RotatingState {
       let to = rotated_path(dir, &self.file_name, index + 1);
       move_file(&from, &to)?;
     }
-    move_file(&dir.join(&self.file_name), &rotated_path(dir, &self.file_name, 1))?;
+    move_file(
+      &dir.join(&self.file_name),
+      &rotated_path(dir, &self.file_name, 1),
+    )?;
     self.size = 0;
     self.open(dir)
   }
@@ -476,16 +483,22 @@ impl<'a> MakeWriter<'a> for SizeRotatingFile {
 // ---------------------------------------------------------------------------
 
 /// File layer with the production writer (shared lazy dir, 5 MB × 5).
-pub fn file_log_layer(default_level: LevelFilter) -> Box<dyn Layer<Registry> + Send + Sync> {
+pub fn file_log_layer<S>(default_level: LevelFilter) -> Box<dyn Layer<S> + Send + Sync>
+where
+  S: Subscriber + for<'a> LookupSpan<'a>,
+{
   let writer = SizeRotatingFile::new(shared_log_dir(), LOG_FILE_NAME, MAX_FILE_BYTES, MAX_FILES);
   file_log_layer_with(writer, default_level)
 }
 
 /// File layer with an injected writer (used by the L1 tests for rotation/threshold checks).
-pub fn file_log_layer_with(
+pub fn file_log_layer_with<S>(
   writer: SizeRotatingFile,
   default_level: LevelFilter,
-) -> Box<dyn Layer<Registry> + Send + Sync> {
+) -> Box<dyn Layer<S> + Send + Sync>
+where
+  S: Subscriber + for<'a> LookupSpan<'a>,
+{
   tracing_subscriber::fmt::layer()
     .event_format(FileLogFormat::new())
     .with_ansi(false)
@@ -498,7 +511,10 @@ fn file_layer_filter(default_level: LevelFilter) -> Targets {
   // Same noise exclusions as the fmt/Sentry layers.
   Targets::new()
     .with_target("tauri_plugin_updater", LevelFilter::OFF)
-    .with_target("tao::platform_impl::platform::event_loop::runner", LevelFilter::OFF)
+    .with_target(
+      "tao::platform_impl::platform::event_loop::runner",
+      LevelFilter::OFF,
+    )
     .with_target("h2", LevelFilter::OFF)
     .with_target("hyper_util", LevelFilter::OFF)
     .with_default(default_level)
@@ -531,7 +547,10 @@ mod tests {
 
   impl Write for BufferWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-      let mut guard = self.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+      let mut guard = self
+        .0
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
       guard.extend_from_slice(buf);
       Ok(buf.len())
     }
@@ -558,7 +577,9 @@ mod tests {
       .finish();
     tracing::subscriber::with_default(subscriber, emit);
     let mutex = &writer.0;
-    let guard = mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let guard = mutex
+      .lock()
+      .unwrap_or_else(|poisoned| poisoned.into_inner());
     String::from_utf8_lossy(guard.as_slice()).into_owned()
   }
 
