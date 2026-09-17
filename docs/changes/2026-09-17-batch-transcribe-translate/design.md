@@ -439,6 +439,7 @@ logging: {
 | 日志误记敏感值（Cookie/Key/签名 URL 的 query） | 泄漏到本地文件/被分享排查 | 集中脱敏（敏感字段布尔化）+ 失败响应截断 + 文件仅存本机不上传；URL 按已确认决策记完整值（2026-09-17 决定 A），文档与 UI 提示“外发前先检查”；AC-23 断言其他敏感值不出现 |
 | 日志无限增长/写满磁盘 | 磁盘占满导致下载/转录失败 | 5MB × 5 轮转 + `verbose` 默认关；轮转失败只告警不重试；AC-25 断言上限 |
 | 新增依赖 `tracing-appender` 的版本/许可证风险 | 构建/合规问题 | 官方 tracing 生态 crate（MIT/Apache-2.0），随 `npm run licenses:rust` 进入许可证清单；CI 构建验证 |
+| **YouTube 现行反爬要求**：yt-dlp 2026.07+ 对 YouTube 需 JS runtime + EJS challenge solver（n challenge），否则媒体 GET 403 | 真实下载阶段直接失败，整条链路不可用 | L005 真实媒体干跑实测（2026-09-17，video `nIABz0Z4IRA`，见 implementation-notes §8）：本机无 deno，需 `--js-runtimes node --remote-components ejs:github` 且 `player_client=mweb` 才成功（并回退到 `best`）；`ejs:github` 运行时从 GitHub 取脚本与“远端内容必须签名校验”的规则冲突。**需在 L008/Phase C 前定方案**：① 签名清单分发 JS runtime 与 EJS 求解脚本；② 依赖用户 Cookie；③ 固定可用的 player_client 组合；并同步 toolchain 文档 |
 | 日志写入竞争/阻塞主流程 | 转录变慢 | non-blocking writer（独立写线程）+ 写失败静默降级；不在流水线关键路径上做同步 fsync |
 
 ## Verification

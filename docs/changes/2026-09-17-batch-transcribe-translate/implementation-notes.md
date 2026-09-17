@@ -143,3 +143,38 @@ whisper --model tiny.en --device cuda --fp16 True  --language en --task transcri
   - 命令：`rustfmt --check <files>`（自动读取 `src-tauri/rustfmt.toml`）；对只依赖 std 的模块建独立 crate（`mod transcribe;` + 复制模块），`rustc --edition 2021 --test --target wasm32-wasip1 --crate-name <name> src/lib.rs -o tests.wasm` 后用 `node:wasi`（`preview1`）跑（L005：35/35 通过）；`clippy-driver … -o out.wasm -D warnings`（L005：0 warning）。
   - 边界：npm 渠道的 beta 官方二进制，只覆盖 std-only 模块，**不替代**整仓 `cargo fmt/clippy/test`，也不进 CI；主机构建仍缺 MSVC 链接库。
   - 顺带发现（需后续清理循环处理）：整仓 `rustfmt --check` 在 L001–L004 的 5 个文件仍有 11 处格式偏差：`logging/file_log.rs`(5)、`state/config.rs`(3)、`runners/whisper_runner.rs`(1)、`runners/ytdlp_process.rs`(1)、`runners/ytdlp_args/tests.rs`(1)；需跑 `cargo fmt --all`。
+
+## 8. L005 真实媒体干跑（2026-09-17，开发者指定 video `nIABz0Z4IRA`）
+
+范围：用真实 yt-dlp/ffmpeg/whisper（GPU）+ 真 Rust 纯函数（wasm harness，见 §7）跑通“下载→探测→分块→转录→合并→英文原稿”。
+这是**后端干跑**，不是应用级 E2E：L006/L008/L009 与 Phase B 尚未实现，且本机无 cargo 无法构建 Tauri 应用。
+
+视频：`How to Learn So Fast People Assume You're Naturally Gifted`，时长 **502.224399s**（8m22s）。
+
+### 8.1 实测结论
+
+| 环节 | 结果 |
+| --- | --- |
+| 下载（AC-02 语义） | `-f ba/best` 需搭配 `--js-runtimes node --remote-components ejs:github --extractor-args "youtube:player_client=mweb"` 才成功；无 JS runtime 时 n challenge 失败、媒体 GET 返回 **HTTP 403**。本次 mweb 的纯音频格式因缺 GVS PO Token 被跳过，`ba/best` 按设计回退到 `best`（format 18，27.9MB 视频+音频） |
+| 时长（L004） | `ffprobe -v error -show_entries format=duration -of json` → `502.224399` |
+| 分块（AC-05） | 真 Rust `plan_chunks`：默认 20min → 1 块 `[0,502.224]`；3min → `[0,180] [180,360] [360,502.224]` |
+| 切块（L004 的 `-t` 偏差） | `-ss <start> -i <in> -t <end-start> -c copy`；实测块长 180.001088 / 180.001995 / 142.223991，与计划跨度一致 |
+| whisper stdout 契约（AC-03） | 每块 stdout 段行数 == JSON `segments` 数（68/67/33，全部 MATCH），`language=en`；`small` 首次自动下载 |
+| 真 Rust 合并（AC-07） | 168 段 = 68+67+33（零丢失），`covered=502.224`，无 coverage gap；`boundary_risks` 命中 chunk 0/1（tail+head 均为 true） |
+| 真 Rust 原稿（AC-09） | 28 段 / 8843 字符；与整片单块转录（209 段 / 33 段 / 8841 字符）做词级 difflib：**相似度 0.9933**，10 处差异均为 ASR 抖动（`gonna`/`going to`、`cause`/`because`、漏听 `I'll`、`otherwise`/`lois`），**无边界丢词**：切点句 “you think it would help you | be less confused” 两块合起来完整（同理 “figure | it out”） |
+| 缺失块路径（AC-07 告警） | 人为去掉 chunk 1 的段：`segments=101`、`covered=322.224`、`COVERAGE_GAP chunk=1 gap=180.000`，其余段零丢失 |
+| 性能（RTX 5050 8GB，`small`+fp16） | 3min 块 17–22s/次（含模型加载）；502s 整片 49s，约 **10× 实时**；运行时空闲显存约 7.2GB |
+
+### 8.2 真实边界告警观察
+
+两处内部边界都报了 `chunkBoundaryRisk`（tail+head）：
+
+- head 恒真：whisper 对每块总有一个 `start=0.0` 的首段；
+- tail 恒真：块末段会越过切点（实测 chunk 0 末段 `end=180.20` > 切点 `180.001`），合并侧按 span 截断覆盖但不丢文本。
+
+即按现有阈值，**几乎每个句中切点都会告警**（warning-only、保留现场，符合设计）；若 Phase C 验收认为噪声过大，可在评审时讨论调参（例如要求 tail+head 同时命中、或对重叠音频做词级校验），本期不改规则。
+
+### 8.3 待定/风险（已同步 design Risks）
+
+- **YouTube 现行下载要求**：yt-dlp 2026.07 起对 YouTube 需 JS runtime + EJS 求解脚本，否则 403；`--remote-components ejs:github` 会在运行时从 GitHub 取脚本，与“远端内容必须签名校验”的架构规则冲突，需在 L008/Phase C 前定方案（签名清单分发 JS runtime+求解脚本 / 依赖用户 Cookie / 固定可用 client）。
+- 干跑产物留在 `E:\tmp\ytb-e2e\`（`transcript_chunked.txt`、`transcript_whole.txt`、各块 JSON/stdout/stderr），未进入仓库；应用级 L3 验收仍需等 L006–L009 + Phase B。
