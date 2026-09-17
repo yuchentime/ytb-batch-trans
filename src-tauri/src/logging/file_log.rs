@@ -111,12 +111,12 @@ pub fn configure(app_dir: &Path) {
 // Sanitizing and redaction
 // ---------------------------------------------------------------------------
 
-/// Collapses line breaks/tabs to spaces and drops other control characters, so one event
-/// always produces exactly one line.
+/// Collapses line breaks/tabs (including U+2028/U+2029 line separators) to spaces and drops
+/// other control characters, so one event always produces exactly one line.
 pub fn sanitize_field(value: &str) -> String {
   let mut out = String::with_capacity(value.len());
   for ch in value.chars() {
-    if ch == '\n' || ch == '\r' || ch == '\t' {
+    if matches!(ch, '\n' | '\r' | '\t' | '\u{2028}' | '\u{2029}') {
       out.push(' ');
     } else if !ch.is_control() {
       out.push(ch);
@@ -617,6 +617,17 @@ mod tests {
     let value = line.split(" title=").nth(1).expect("title field");
     assert_eq!(value.chars().count(), TITLE_MAX_CHARS);
     assert!(value.ends_with('…'));
+  }
+
+  #[test]
+  fn file_log_collapses_unicode_line_separators() {
+    let dir = temp_dir("log-separator");
+
+    let content = format_events(&dir, || {
+      tracing::info!(event = events::TRANSCRIPT_EN_OK, title = %"a\u{2028}b\u{2029}c");
+    });
+
+    assert!(content.contains("title=a b c"));
   }
 
   #[test]

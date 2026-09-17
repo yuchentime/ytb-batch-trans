@@ -8,46 +8,28 @@ use crate::runners::ytdlp_args::{
   build_auth_args, build_format_args, build_input_filter_args, build_location_args,
   build_network_args, build_output_args,
 };
-use crate::runners::ytdlp_process::{
-  configure_command, kill_platform_process, platform_process_from_child, PlatformProcess,
-};
+use crate::runners::ytdlp_process::{configure_command, prepend_bin_dir_to_path, spawn_piped};
 use crate::state::config_models::{AuthSettings, Config, SponsorBlockSettings, SubtitleSettings};
 use crate::state::preferences_models::Preferences;
 use crate::stronghold::stronghold_state::{AuthSecrets, StrongholdState};
 use crate::{SharedConfig, SharedPreferences};
 use std::collections::{HashMap, HashSet};
-use std::io::{BufReader, Read};
 use std::path::PathBuf;
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{Command, ExitStatus};
 use std::sync::Arc;
-use std::thread;
 use tauri::{AppHandle, Manager};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::UnboundedReceiver;
 
-#[derive(Debug, Clone)]
-pub struct TerminatedPayload {
-  pub code: Option<i32>,
-}
-
-#[derive(Debug, Clone)]
-#[non_exhaustive]
-pub enum YtdlpCommandEvent {
-  Stderr(Vec<u8>),
-  Stdout(Vec<u8>),
-  Error(String),
-  Terminated(TerminatedPayload),
-}
+// Shared process plumbing (spawn, hidden window, process group/Job Object, kill tree).
+pub use crate::runners::ytdlp_process::{
+  PipedProcess as YtdlpChild, ProcessEvent as YtdlpCommandEvent,
+};
 
 #[derive(Debug)]
 pub struct YtdlpOutput {
   pub status: ExitStatus,
   pub stdout: Vec<u8>,
   pub stderr: Vec<u8>,
-}
-
-#[derive(Debug)]
-pub struct YtdlpChild {
-  platform: PlatformProcess,
 }
 
 pub struct YtdlpRunner<'a> {
@@ -269,64 +251,13 @@ impl<'a> YtdlpRunner<'a> {
   pub fn spawn(self) -> Result<(UnboundedReceiver<YtdlpCommandEvent>, YtdlpChild), String> {
     log_run_summary(&self.args);
     tracing::debug!("Running command: yt-dlp {}", self.args.join(" "));
-    let mut command = self.build_command();
-    command
-      .stdin(Stdio::piped())
-      .stdout(Stdio::piped())
-      .stderr(Stdio::piped());
-
-    configure_command(&mut command).map_err(|e| format!("yt-dlp spawn setup failed: {e}"))?;
-
-    let mut raw_child = command
-      .spawn()
-      .map_err(|e| format!("yt-dlp failed to spawn: {e}"))?;
-    let stdout = raw_child.stdout.take();
-    let stderr = raw_child.stderr.take();
-
-    let platform = match platform_process_from_child(&raw_child) {
-      Ok(platform) => platform,
-      Err(err) => {
-        let _ = raw_child.kill();
-        return Err(err);
-      }
-    };
-
-    let (tx, rx) = unbounded_channel();
-
-    if let Some(stdout) = stdout {
-      spawn_reader(stdout, tx.clone(), true);
-    }
-    if let Some(stderr) = stderr {
-      spawn_reader(stderr, tx.clone(), false);
-    }
-
-    let wait_tx = tx.clone();
-    thread::spawn(move || {
-      let status = raw_child.wait();
-      match status {
-        Ok(status) => {
-          let payload = TerminatedPayload {
-            code: status.code(),
-          };
-          let _ = wait_tx.send(YtdlpCommandEvent::Terminated(payload));
-        }
-        Err(err) => {
-          let _ = wait_tx.send(YtdlpCommandEvent::Error(err.to_string()));
-        }
-      }
-    });
-
-    let child = YtdlpChild { platform };
-
-    Ok((rx, child))
+    spawn_piped(self.build_command())
   }
 
   fn build_command(&self) -> Command {
-    let separator = if cfg!(windows) { ';' } else { ':' };
-    let path_env = std::env::var("PATH").unwrap_or_default();
-    let new_path = format!("{}{}{}", self.bin_dir.display(), separator, path_env);
     let mut command = Command::new("yt-dlp");
-    command.args(&self.args).env("PATH", new_path);
+    command.args(&self.args);
+    prepend_bin_dir_to_path(&mut command, &self.bin_dir);
     command
   }
 }
@@ -378,60 +309,6 @@ fn log_run_summary(args: &[String]) {
     has_auth = summary.has_auth,
     "Running yt-dlp command"
   );
-}
-
-impl YtdlpChild {
-  pub fn kill_tree(&self) -> Result<(), String> {
-    kill_platform_process(&self.platform);
-    Ok(())
-  }
-}
-
-fn spawn_reader<R: Read + Send + 'static>(
-  reader: R,
-  tx: UnboundedSender<YtdlpCommandEvent>,
-  is_stdout: bool,
-) {
-  thread::spawn(move || {
-    let mut reader = BufReader::new(reader);
-    let mut buf = Vec::new();
-    let mut byte = [0_u8; 1];
-
-    loop {
-      match reader.read(&mut byte) {
-        Ok(0) => {
-          if !buf.is_empty() {
-            let out = std::mem::take(&mut buf);
-            let event = if is_stdout {
-              YtdlpCommandEvent::Stdout(out)
-            } else {
-              YtdlpCommandEvent::Stderr(out)
-            };
-            let _ = tx.send(event);
-          }
-          break;
-        }
-        Ok(_) if matches!(byte[0], b'\n' | b'\r') => {
-          if buf.is_empty() {
-            continue;
-          }
-
-          let out = std::mem::take(&mut buf);
-          let event = if is_stdout {
-            YtdlpCommandEvent::Stdout(out)
-          } else {
-            YtdlpCommandEvent::Stderr(out)
-          };
-          let _ = tx.send(event);
-        }
-        Ok(_) => buf.push(byte[0]),
-        Err(err) => {
-          let _ = tx.send(YtdlpCommandEvent::Error(err.to_string()));
-          break;
-        }
-      }
-    }
-  });
 }
 
 fn build_subtitle_args(
