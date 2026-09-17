@@ -366,3 +366,16 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 | 卡片动作 | `transcribeMode` 卡片隐藏下载/暂停/恢复，只保留删除（后端 `group_cancel`）、外链、错误重试（`retryTranscriptionGroup` 重建批次）；metadata 入口保留 |
 | 测试 | 单测 `transcriptionFlow.spec.ts`（批次创建 + 播放列表拆分）、`header.spec.ts`（输入 → `startTranscriptionBatch`、环境门禁禁用按钮 + 提交跳 `/setup`）；E2E `transcribe-flow.spec.ts`（add → 转录/翻译步骤与 token）；下载向 E2E 退场：删除 `download-progress`/`global-selection`/`group-behaviour`/`playlist-selection`/`persist-selection`/`queue-actions` 六个 spec（对应 UI 属第 16 项删除范围） |
 | 未做 | `configure`/`MediaConfigureStep` 与下载向 helpers/组件/单测的物理删除留到第 16 项（同一删除面）；`media_info`/`media_playlist_expand` 命令仍在后端但前端已无入口 |
+
+## 16. 设置页签与模型配置（L014）
+
+| 维度 | 决定 |
+| --- | --- |
+| 页签 | `settings` 改为 转录 / 翻译 / 输出 / 网络 / 系统 / 关于（默认 `settings.transcription`）；`SettingsDownloadsTab`/`SettingsAppTab` 删除，外观/通知/输入/更新并入系统页；顶栏设置链指向 `settings.transcription` |
+| 转录页 | `SettingsTranscription.vue`：model（small/medium/large-v3）、device（cuda/cpu）、fp16、language（en/auto）、chunkMinutes（0=不分块）、keepAudio、conditionOnPreviousText、whisperPath 覆盖 |
+| 翻译页 | `SettingsTranslation.vue`：`ai.apiKey`（password + 保存 + 已配置/未配置徽标）、baseUrl、model、temperature、concurrency、maxRetries、dropFillers、术语表 textarea |
+| API key 写入 | `stronghold` store 新增 `setAiApiKey(value)`：只写 `ai.apiKey`，**从不读回**（`getValues` 仍只覆盖 auth 字段）；“是否已配置”由 `transcription_probe.apiKeyConfigured` 展示，保存后重跑 probe 刷新 |
+| 输出页 | `SettingsOutput.vue` 重写为 rootDir / overwrite / restrictFilenames（旧的 video/audio/模板/后处理字段不再展示） |
+| i18n | `settings.tabs`/`settings.transcription`/`settings.translation`/`settings.output` 已补 `en` + `zh-CN`；其余 11 种语言暂缺（vue-i18n 回退 en，翻译补齐属后续收尾） |
+| 删除 | `SettingsDownloadsTab.vue`/`SettingsAppTab.vue`；`tests/unit/postprocessSettings.spec.ts`/`postprocessOverrides.spec.ts`（针对已移除的后处理 UI） |
+| 测试 | `settingsView.spec.ts` 改为新页签 + 用转录页复选框验证 save/reset；`header.spec.ts` 路由名同步 |
