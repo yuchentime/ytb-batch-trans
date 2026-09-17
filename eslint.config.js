@@ -68,4 +68,14 @@ export default [
       },
     },
   },
+  {
+    // Plain-ESM dev script (no TypeScript): needs a modern parser, unlike the app code
+    // whose pinned ecmaVersion predates optional catch binding / optional chaining. This
+    // block is last on purpose so it overrides the inherited ecmaVersion.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+    },
+  },
 ];
