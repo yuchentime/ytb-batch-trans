@@ -842,7 +842,8 @@
           "playlistFinished": "Playlist terminée",
           "downloadFailed": "Échec du téléchargement",
           "videoReady": "Vidéo prête",
-          "playlistReady": "Playlist prête"
+          "playlistReady": "Playlist prête",
+          "batchFinished": "Lot terminé"
         }
       }
     },

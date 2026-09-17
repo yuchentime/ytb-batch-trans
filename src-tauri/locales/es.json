@@ -46,6 +46,10 @@
     "downloadFailed": {
       "title": "Error en la descarga",
       "body": "{title}\n{message}"
+    },
+    "batchFinished": {
+      "title": "Lote finalizado",
+      "body": "Completados: {done} · Fallidos: {failed} · Omitidos: {skipped}"
     }
   }
 }

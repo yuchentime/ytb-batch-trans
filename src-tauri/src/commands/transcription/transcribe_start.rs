@@ -48,6 +48,7 @@ pub fn transcribe_start(
         group_id,
         id: Uuid::new_v4().to_string(),
         url,
+        total: 1,
       }
     })
     .collect::<Vec<_>>();

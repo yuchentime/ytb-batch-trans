@@ -939,7 +939,8 @@
           "playlistFinished": "Lista de reproducción completada",
           "downloadFailed": "Descarga fallida",
           "videoReady": "Video listo para descargar",
-          "playlistReady": "Lista de reproducción lista para descargar"
+          "playlistReady": "Lista de reproducción lista para descargar",
+          "batchFinished": "Lote finalizado"
         }
       }
     },

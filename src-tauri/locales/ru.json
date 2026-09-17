@@ -46,6 +46,10 @@
     "downloadFailed": {
       "title": "Ошибка скачивания",
       "body": "{title}\n{message}"
+    },
+    "batchFinished": {
+      "title": "Пакет завершён",
+      "body": "Готово: {done} · Ошибок: {failed} · Пропущено: {skipped}"
     }
   }
 }

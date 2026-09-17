@@ -14,7 +14,8 @@ use crate::models::transcribe::{
   TranscribeProgressPayload, TranscribeStage, TranscribeStagePayload, TranslateProgressPayload,
   VideoErrorCode, VideoStatus,
 };
-use crate::models::ParsedMedia;
+use crate::models::{ParsedMedia, ParsedPlaylist, ParsedSingleVideo, PlaylistEntry};
+use crate::notifications::{notify, NotificationKind};
 use crate::paths::PathsManager;
 use crate::runners::ffmpeg_runner::{cut_chunk, probe_duration, FfmpegError};
 use crate::runners::whisper_runner::{transcribe_chunk, WhisperChunkRequest, WhisperError};
@@ -45,9 +46,10 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::watch;
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct TranscribeSender(pub UnboundedSender<DispatchRequest<TranscribeRequest>>);
@@ -59,15 +61,24 @@ pub enum TranscribeRequest {
     root_dir: PathBuf,
     entries: Vec<TranscribeEntry>,
   },
+  /// Videos discovered inside a playlist link, appended to a running batch (design §2).
+  /// The entry that carried the link never reports an outcome, so the dispatcher
+  /// replaces its pending slot with the children.
+  Expand {
+    batch_id: String,
+    entries: Vec<TranscribeEntry>,
+  },
 }
 
-/// One video in a transcribe batch. `id` is the media id used by the IPC payloads.
+/// One video in a transcribe batch. `id` is the media id used by the IPC payloads;
+/// `total` is the number of videos in the link's group (playlist links expand).
 #[derive(Clone, Debug)]
 pub struct TranscribeEntry {
   pub batch_id: String,
   pub group_id: String,
   pub id: String,
   pub url: String,
+  pub total: usize,
 }
 
 impl DispatchEntry for TranscribeEntry {
@@ -104,10 +115,21 @@ pub fn setup_transcribe_dispatcher(
           })
           .collect()
       }
+      TranscribeRequest::Expand { batch_id, entries } => {
+        expand_batch(&batch_id, entries.len());
+        entries
+          .into_iter()
+          .map(|mut entry| {
+            entry.batch_id = batch_id.clone();
+            entry
+          })
+          .collect()
+      }
     },
     |_tx, app: AppHandle, entry: TranscribeEntry| async move {
-      let outcome = run_video(app.clone(), entry).await;
-      record_outcome(&app, outcome);
+      if let Some(outcome) = run_video(app.clone(), entry).await {
+        record_outcome(&app, outcome);
+      }
     },
   )
 }
@@ -133,7 +155,22 @@ fn register_batch(batch_id: &str, root_dir: &Path, total: usize) {
   );
 }
 
-fn record_outcome(app: &AppHandle, outcome: VideoOutcome) {
+/// Accounts a playlist expansion: the not-yet-reported link entry is replaced by its
+/// child videos, so the batch finishes exactly once per expanded video.
+fn expand_batch(batch_id: &str, children: usize) {
+  let mut batches = BATCHES.lock().unwrap();
+  let Some(state) = batches.get_mut(batch_id) else {
+    tracing::warn!(
+      run = %batch_id,
+      entries = children,
+      "playlist expansion for an unknown batch"
+    );
+    return;
+  };
+  state.remaining = state.remaining.saturating_sub(1).saturating_add(children);
+}
+
+fn record_outcome<R: Runtime>(app: &AppHandle<R>, outcome: VideoOutcome) {
   let mut batches = BATCHES.lock().unwrap();
   let Some(state) = batches.get_mut(&outcome.entry.batch_id) else {
     return;
@@ -176,10 +213,11 @@ fn record_outcome(app: &AppHandle, outcome: VideoOutcome) {
     .filter(|item| item.status == VideoStatus::Failed)
     .count();
   let skipped = state.items.iter().filter(|item| item.skipped).count();
+  let count = state.items.len();
   tracing::info!(
     event = events::RUN_END,
     run = %outcome.entry.batch_id,
-    count = state.items.len(),
+    count = count,
     done = done,
     failed = failed,
     skipped = skipped,
@@ -192,6 +230,33 @@ fn record_outcome(app: &AppHandle, outcome: VideoOutcome) {
       items: state.items,
     },
   );
+
+  // Design §7: one notification per finished batch, whether it succeeded or failed.
+  if let Err(error) = notify(
+    app,
+    NotificationKind::BatchFinished,
+    Some(batch_notification_params(done, failed, skipped)),
+    false,
+  ) {
+    tracing::warn!(
+      run = %outcome.entry.batch_id,
+      error = %error,
+      "failed to send the batch notification"
+    );
+  }
+}
+
+/// Params of the `notifications.batchFinished` message (pure, so it is unit-tested).
+fn batch_notification_params(
+  done: usize,
+  failed: usize,
+  skipped: usize,
+) -> HashMap<String, String> {
+  HashMap::from([
+    ("done".to_string(), done.to_string()),
+    ("failed".to_string(), failed.to_string()),
+    ("skipped".to_string(), skipped.to_string()),
+  ])
 }
 
 /// `summary.md` rows: status, outputs, failure code and token usage per video (AC-19).
@@ -299,16 +364,18 @@ impl JobError {
   }
 }
 
-async fn run_video(app: AppHandle, entry: TranscribeEntry) -> VideoOutcome {
+/// Runs one task entry. Returns `None` when the entry was a playlist link that was
+/// expanded into child tasks — those children report their own outcomes instead.
+async fn run_video(app: AppHandle, entry: TranscribeEntry) -> Option<VideoOutcome> {
   let cfg = app.state::<SharedConfig>().load();
   let Some(root_dir) = cfg.output.root_dir.as_deref().map(PathBuf::from) else {
-    return fail_video(
+    return Some(fail_video(
       &app,
       &entry,
       "setup",
       VideoErrorCode::OutputWriteFailed,
       "output root directory is not configured",
-    );
+    ));
   };
 
   // AC-14: the already-exists check is local only — no yt-dlp, whisper or DeepSeek call.
@@ -331,14 +398,23 @@ async fn run_video(app: AppHandle, entry: TranscribeEntry) -> VideoOutcome {
           group_id: entry.group_id.clone(),
         },
       );
-      return VideoOutcome::done(entry, paths, true, Usage::default());
+      return Some(VideoOutcome::done(entry, paths, true, Usage::default()));
     }
   }
 
   let mut cancel = subscribe_group(&entry.group_id);
-  let single = match fetch_metadata(&app, &entry).await {
-    Ok(single) => single,
-    Err(error) => return finish_error(&app, &entry, "fetching", error),
+  let media = match fetch_metadata(&app, &entry).await {
+    Ok(media) => media,
+    Err(error) => return Some(finish_error(&app, &entry, "fetching", error)),
+  };
+  let single = match media {
+    FetchedMedia::Single(single) => *single,
+    FetchedMedia::Playlist(playlist) => {
+      return match expand_playlist(&app, &entry, *playlist) {
+        Ok(()) => None,
+        Err(error) => Some(finish_error(&app, &entry, "fetching", error)),
+      };
+    }
   };
   let title = single.title.clone().unwrap_or_else(|| entry.id.clone());
   let outputs = OutputPaths::new(&root_dir, &title, cfg.output.restrict_filenames);
@@ -375,7 +451,7 @@ async fn run_video(app: AppHandle, entry: TranscribeEntry) -> VideoOutcome {
           group_id: entry.group_id.clone(),
         },
       );
-      VideoOutcome::done(
+      Some(VideoOutcome::done(
         entry,
         vec![
           outputs.en.display().to_string(),
@@ -383,7 +459,7 @@ async fn run_video(app: AppHandle, entry: TranscribeEntry) -> VideoOutcome {
         ],
         skipped,
         usage,
-      )
+      ))
     }
     Err(JobError::Cancelled) => {
       tracing::warn!(
@@ -392,9 +468,11 @@ async fn run_video(app: AppHandle, entry: TranscribeEntry) -> VideoOutcome {
         group = %entry.group_id,
         stage = "pipeline",
       );
-      VideoOutcome::cancelled(entry)
+      Some(VideoOutcome::cancelled(entry))
     }
-    Err(JobError::Failed(code, message)) => fail_video(&app, &entry, "pipeline", code, &message),
+    Err(JobError::Failed(code, message)) => {
+      Some(fail_video(&app, &entry, "pipeline", code, &message))
+    }
   }
 }
 
@@ -437,10 +515,18 @@ fn fail_video(
   VideoOutcome::failed(entry.clone(), code)
 }
 
+/// Metadata resolved for one task entry: a single video, or a playlist to expand.
+enum FetchedMedia {
+  Single(Box<ParsedSingleVideo>),
+  Playlist(Box<ParsedPlaylist>),
+}
+
+/// Fetches metadata for one task entry. A single video emits `media_add` here; a playlist
+/// is handed back to `expand_playlist` (design §2).
 async fn fetch_metadata(
   app: &AppHandle,
   entry: &TranscribeEntry,
-) -> Result<crate::models::ParsedSingleVideo, JobError> {
+) -> Result<FetchedMedia, JobError> {
   let fetched = run_ytdlp_info_fetch(
     app,
     entry.id.clone(),
@@ -451,14 +537,8 @@ async fn fetch_metadata(
   )
   .await;
 
-  let single = match fetched {
-    Ok(Some(ParsedMedia::Single(single))) => single,
-    Ok(Some(_)) => {
-      return Err(JobError::failed(
-        VideoErrorCode::FetchFailed,
-        "playlist and livestream links are expanded before the batch starts",
-      ))
-    }
+  let media = match fetched {
+    Ok(Some(media)) => media,
     Ok(None) | Err(_) => {
       return Err(JobError::failed(
         VideoErrorCode::FetchFailed,
@@ -467,15 +547,93 @@ async fn fetch_metadata(
     }
   };
 
+  match media {
+    ParsedMedia::Single(single) => {
+      let _ = app.emit(
+        "media_add",
+        MediaAddPayload {
+          group_id: entry.group_id.clone(),
+          total: entry.total,
+          item: single.clone(),
+        },
+      );
+      Ok(FetchedMedia::Single(Box::new(single)))
+    }
+    ParsedMedia::Playlist(playlist) => Ok(FetchedMedia::Playlist(Box::new(playlist))),
+    ParsedMedia::Livestream(_) => Err(JobError::failed(
+      VideoErrorCode::FetchFailed,
+      "livestreams are not supported",
+    )),
+  }
+}
+
+/// Expands a playlist link into one child task per entry, all in the link's group, and
+/// enqueues them into the running batch. Emits the playlist as the group's `media_add`
+/// leader so the UI can render the group before the videos arrive.
+fn expand_playlist(
+  app: &AppHandle,
+  entry: &TranscribeEntry,
+  playlist: ParsedPlaylist,
+) -> Result<(), JobError> {
+  let children = playlist_children(entry, &playlist.entries);
+  if children.is_empty() {
+    return Err(JobError::failed(
+      VideoErrorCode::FetchFailed,
+      "playlist has no usable entries",
+    ));
+  }
+
   let _ = app.emit(
     "media_add",
     MediaAddPayload {
       group_id: entry.group_id.clone(),
-      total: 1,
-      item: single.clone(),
+      total: children.len(),
+      item: playlist,
     },
   );
-  Ok(single)
+  tracing::info!(
+    event = events::PLAYLIST_EXPAND,
+    run = %entry.batch_id,
+    group = %entry.group_id,
+    entries = children.len(),
+  );
+
+  app
+    .state::<TranscribeSender>()
+    .0
+    .send(DispatchRequest::Pipeline(TranscribeRequest::Expand {
+      batch_id: entry.batch_id.clone(),
+      entries: children,
+    }))
+    .map_err(|error| {
+      JobError::failed(
+        VideoErrorCode::FetchFailed,
+        format!("enqueue the playlist entries: {error}"),
+      )
+    })
+}
+
+/// Maps playlist entries to child video tasks: the link keeps its group id and every
+/// entry becomes a video item in it (design §1/§2). Entries without a URL are skipped.
+fn playlist_children(parent: &TranscribeEntry, entries: &[PlaylistEntry]) -> Vec<TranscribeEntry> {
+  let urls = entries
+    .iter()
+    .map(|entry| entry.video_url.trim())
+    .filter(|url| !url.is_empty())
+    .map(str::to_string)
+    .collect::<Vec<_>>();
+  let total = urls.len();
+
+  urls
+    .into_iter()
+    .map(|url| TranscribeEntry {
+      batch_id: parent.batch_id.clone(),
+      group_id: parent.group_id.clone(),
+      id: Uuid::new_v4().to_string(),
+      url,
+      total,
+    })
+    .collect()
 }
 
 fn set_stage(app: &AppHandle, entry: &TranscribeEntry, stage: TranscribeStage) {
@@ -1280,6 +1438,7 @@ fn read_whisper_segments(path: &Path) -> Result<Vec<Segment>, String> {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::parsers::ytdlp_info::parse_ytdlp_info;
 
   fn item(
     url: &str,
@@ -1399,6 +1558,7 @@ mod tests {
       group_id: "group".into(),
       id: "id".into(),
       url: "https://a".into(),
+      total: 1,
     };
 
     let done = VideoOutcome::done(
@@ -1420,5 +1580,142 @@ mod tests {
     let cancelled = VideoOutcome::cancelled(entry);
     assert_eq!(cancelled.status, VideoStatus::Cancelled);
     assert!(cancelled.outputs.is_empty());
+  }
+
+  fn parent_entry() -> TranscribeEntry {
+    TranscribeEntry {
+      batch_id: "batch".into(),
+      group_id: "group".into(),
+      id: "parent".into(),
+      url: "https://example.com/playlist".into(),
+      total: 1,
+    }
+  }
+
+  fn playlist_entry(url: &str, index: usize) -> PlaylistEntry {
+    PlaylistEntry {
+      video_url: url.to_string(),
+      index,
+    }
+  }
+
+  #[test]
+  fn playlist_children_reuse_the_link_group_and_keep_entry_order() {
+    let parent = parent_entry();
+    let entries = vec![
+      playlist_entry("  https://example.com/a  ", 0),
+      playlist_entry("", 1),
+      playlist_entry("https://example.com/b", 2),
+    ];
+
+    let children = playlist_children(&parent, &entries);
+
+    assert_eq!(children.len(), 2);
+    assert_eq!(children[0].url, "https://example.com/a");
+    assert_eq!(children[1].url, "https://example.com/b");
+    assert!(children
+      .iter()
+      .all(|child| child.group_id == parent.group_id && child.batch_id == parent.batch_id));
+    assert!(children.iter().all(|child| child.id != parent.id));
+    assert_ne!(children[0].id, children[1].id);
+    assert!(children.iter().all(|child| child.total == 2));
+  }
+
+  #[test]
+  fn flat_playlist_fixture_expands_into_one_task_per_entry() {
+    let fixture = r#"{
+      "id": "PL-fixture",
+      "title": "Fixture playlist",
+      "webpage_url": "https://example.com/playlist",
+      "playlist_count": 3,
+      "entries": [
+        {"url": "https://example.com/watch?v=1", "title": "One"},
+        {"webpage_url": "https://example.com/watch?v=2", "title": "Two"},
+        {"title": "No url"}
+      ]
+    }"#;
+
+    let parsed = parse_ytdlp_info(fixture, "playlist-id".to_string()).expect("fixture parses");
+    let ParsedMedia::Playlist(playlist) = parsed else {
+      panic!("the fixture must be detected as a playlist");
+    };
+
+    let children = playlist_children(&parent_entry(), &playlist.entries);
+
+    assert_eq!(playlist.title.as_deref(), Some("Fixture playlist"));
+    assert_eq!(children.len(), 2);
+    assert_eq!(children[0].url, "https://example.com/watch?v=1");
+    assert_eq!(children[1].url, "https://example.com/watch?v=2");
+  }
+
+  #[test]
+  fn expanding_a_playlist_replaces_the_link_slot_in_the_batch() {
+    let batch = format!("batch-expand-{}", uuid::Uuid::new_v4());
+    register_batch(&batch, Path::new("/tmp"), 1);
+
+    expand_batch(&batch, 3);
+    assert_eq!(BATCHES.lock().unwrap()[&batch].remaining, 3);
+
+    BATCHES.lock().unwrap().remove(&batch);
+  }
+
+  #[test]
+  fn the_last_outcome_writes_the_summary_and_drops_the_batch() {
+    let app = tauri::test::mock_app();
+    let root = std::env::temp_dir().join(format!("ovd-batch-{}", uuid::Uuid::new_v4()));
+    fs::create_dir_all(&root).expect("create root dir");
+    let batch = format!("batch-finish-{}", uuid::Uuid::new_v4());
+
+    register_batch(&batch, &root, 1);
+    expand_batch(&batch, 2);
+    record_outcome(
+      app.handle(),
+      VideoOutcome::done(
+        TranscribeEntry {
+          batch_id: batch.clone(),
+          group_id: "g1".into(),
+          id: "v1".into(),
+          url: "https://example.com/a".into(),
+          total: 2,
+        },
+        vec!["a/transcript.en.txt".into()],
+        false,
+        Usage::default(),
+      ),
+    );
+    assert!(
+      BATCHES.lock().unwrap().contains_key(&batch),
+      "the second child is still pending"
+    );
+
+    record_outcome(
+      app.handle(),
+      VideoOutcome::done(
+        TranscribeEntry {
+          batch_id: batch.clone(),
+          group_id: "g2".into(),
+          id: "v2".into(),
+          url: "https://example.com/b".into(),
+          total: 2,
+        },
+        Vec::new(),
+        false,
+        Usage::default(),
+      ),
+    );
+
+    assert!(!BATCHES.lock().unwrap().contains_key(&batch));
+    let summary = fs::read_to_string(root.join(SUMMARY_FILE_NAME)).expect("summary written");
+    assert!(summary.contains("2 videos, 2 done"));
+    let _ = fs::remove_dir_all(&root);
+  }
+
+  #[test]
+  fn batch_notification_params_carry_every_count() {
+    let params = batch_notification_params(2, 1, 1);
+
+    assert_eq!(params.get("done").map(String::as_str), Some("2"));
+    assert_eq!(params.get("failed").map(String::as_str), Some("1"));
+    assert_eq!(params.get("skipped").map(String::as_str), Some("1"));
   }
 }

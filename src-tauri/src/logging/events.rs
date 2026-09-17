@@ -8,6 +8,7 @@ pub const RUN_END: &str = "run.end";
 pub const PROBE_OK: &str = "probe.ok";
 pub const PROBE_MISSING: &str = "probe.missing";
 pub const STAGE_CHANGE: &str = "stage.change";
+pub const PLAYLIST_EXPAND: &str = "playlist.expand";
 pub const AUDIO_DOWNLOAD_START: &str = "audio.download.start";
 pub const AUDIO_DOWNLOAD_OK: &str = "audio.download.ok";
 pub const AUDIO_DOWNLOAD_FAIL: &str = "audio.download.fail";
@@ -52,6 +53,7 @@ mod tests {
       PROBE_OK,
       PROBE_MISSING,
       STAGE_CHANGE,
+      PLAYLIST_EXPAND,
       AUDIO_DOWNLOAD_START,
       AUDIO_DOWNLOAD_OK,
       AUDIO_DOWNLOAD_FAIL,
@@ -89,6 +91,7 @@ mod tests {
       "probe.ok",
       "probe.missing",
       "stage.change",
+      "playlist.expand",
       "audio.download.start",
       "audio.download.ok",
       "audio.download.fail",

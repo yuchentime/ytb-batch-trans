@@ -939,7 +939,8 @@
           "playlistFinished": "재생목록 완료",
           "downloadFailed": "다운로드 실패",
           "videoReady": "동영상 준비됨",
-          "playlistReady": "재생목록 준비됨"
+          "playlistReady": "재생목록 준비됨",
+          "batchFinished": "배치 완료"
         }
       }
     },

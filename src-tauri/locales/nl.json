@@ -46,6 +46,10 @@
     "downloadFailed": {
       "title": "Download mislukt",
       "body": "{title}\n{message}"
+    },
+    "batchFinished": {
+      "title": "Batch voltooid",
+      "body": "Voltooid: {done} · Mislukt: {failed} · Overgeslagen: {skipped}"
     }
   }
 }

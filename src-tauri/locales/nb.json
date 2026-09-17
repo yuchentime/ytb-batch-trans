@@ -46,6 +46,10 @@
     "downloadFailed": {
       "title": "Nedlasting mislyktes",
       "body": "{title}\n{message}"
+    },
+    "batchFinished": {
+      "title": "Batch fullført",
+      "body": "Fullført: {done} · Mislyktes: {failed} · Hoppet over: {skipped}"
     }
   }
 }

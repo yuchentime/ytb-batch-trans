@@ -46,6 +46,10 @@
     "downloadFailed": {
       "title": "下載失敗",
       "body": "{title}\n{message}"
+    },
+    "batchFinished": {
+      "title": "批次完成",
+      "body": "完成：{done} · 失敗：{failed} · 略過：{skipped}"
     }
   }
 }

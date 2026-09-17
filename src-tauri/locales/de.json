@@ -46,6 +46,10 @@
     "downloadFailed": {
       "title": "Download fehlgeschlagen",
       "body": "{title}\n{message}"
+    },
+    "batchFinished": {
+      "title": "Stapel abgeschlossen",
+      "body": "Fertig: {done} · Fehlgeschlagen: {failed} · Übersprungen: {skipped}"
     }
   }
 }

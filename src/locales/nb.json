@@ -842,7 +842,8 @@
           "playlistFinished": "Spilleliste fullført",
           "downloadFailed": "Nedlasting mislyktes",
           "videoReady": "Video klar",
-          "playlistReady": "Spilleliste klar"
+          "playlistReady": "Spilleliste klar",
+          "batchFinished": "Batch fullført"
         }
       }
     },

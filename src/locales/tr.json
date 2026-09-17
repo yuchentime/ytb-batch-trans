@@ -842,7 +842,8 @@
           "playlistFinished": "Oynatma listesi indirildi",
           "downloadFailed": "İndirme başarısız oldu",
           "videoReady": "Video hazır",
-          "playlistReady": "Oynatma listesi hazır"
+          "playlistReady": "Oynatma listesi hazır",
+          "batchFinished": "Toplu iş tamamlandı"
         }
       }
     },

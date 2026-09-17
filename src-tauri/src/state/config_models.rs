@@ -1,8 +1,8 @@
-use crate::commands::NotificationKind;
 use crate::models::download::{
   AudioFormat, AudioPostprocessPreset, TranscodePolicy, VideoContainer, VideoPostprocessMode,
   VideoPostprocessPreset,
 };
+use crate::notifications::NotificationKind;
 use serde::{Deserialize, Serialize};
 use std::thread;
 

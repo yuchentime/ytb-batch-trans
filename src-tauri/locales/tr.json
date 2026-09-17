@@ -46,6 +46,10 @@
     "downloadFailed": {
       "title": "İndirme başarısız oldu",
       "body": "{title}\n{message}"
+    },
+    "batchFinished": {
+      "title": "Toplu iş tamamlandı",
+      "body": "Tamamlandı: {done} · Başarısız: {failed} · Atlandı: {skipped}"
     }
   }
 }

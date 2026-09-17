@@ -4,6 +4,7 @@ mod i18n;
 mod logging;
 mod menu;
 mod models;
+mod notifications;
 mod parsers;
 mod paths;
 mod runners;

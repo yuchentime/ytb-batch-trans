@@ -46,6 +46,10 @@
     "downloadFailed": {
       "title": "Download failed",
       "body": "{title}\n{message}"
+    },
+    "batchFinished": {
+      "title": "Batch finished",
+      "body": "Done: {done} · Failed: {failed} · Skipped: {skipped}"
     }
   }
 }

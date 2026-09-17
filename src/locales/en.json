@@ -939,7 +939,8 @@
           "playlistFinished": "Playlist finished",
           "downloadFailed": "Download failed",
           "videoReady": "Video ready",
-          "playlistReady": "Playlist ready"
+          "playlistReady": "Playlist ready",
+          "batchFinished": "Batch finished"
         }
       }
     },

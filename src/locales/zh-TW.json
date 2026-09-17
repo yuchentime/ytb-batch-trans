@@ -842,7 +842,8 @@
           "playlistFinished": "播放清單完成",
           "downloadFailed": "下載失敗",
           "videoReady": "影片已就緒",
-          "playlistReady": "播放清單已就緒"
+          "playlistReady": "播放清單已就緒",
+          "batchFinished": "批次完成"
         }
       }
     },

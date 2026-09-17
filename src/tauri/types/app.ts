@@ -18,4 +18,5 @@ export enum NotificationKind {
   DownloadFailed = 'downloadFailed',
   VideoReady = 'videoReady',
   PlaylistReady = 'playlistReady',
+  BatchFinished = 'batchFinished',
 }

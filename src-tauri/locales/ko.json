@@ -46,6 +46,10 @@
     "downloadFailed": {
       "title": "다운로드 실패",
       "body": "{title}\n{message}"
+    },
+    "batchFinished": {
+      "title": "배치 완료",
+      "body": "완료: {done} · 실패: {failed} · 건너뜀: {skipped}"
     }
   }
 }

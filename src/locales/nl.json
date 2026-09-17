@@ -842,7 +842,8 @@
           "playlistFinished": "Afspeellijst voltooid",
           "downloadFailed": "Download mislukt",
           "videoReady": "Video gereed",
-          "playlistReady": "Afspeellijst gereed"
+          "playlistReady": "Afspeellijst gereed",
+          "batchFinished": "Batch voltooid"
         }
       }
     },

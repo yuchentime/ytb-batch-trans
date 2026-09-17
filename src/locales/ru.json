@@ -842,7 +842,8 @@
           "playlistFinished": "Плейлист скачан",
           "downloadFailed": "Ошибка скачивания",
           "videoReady": "Видео готово",
-          "playlistReady": "Плейлист готов"
+          "playlistReady": "Плейлист готов",
+          "batchFinished": "Пакет завершён"
         }
       }
     },
