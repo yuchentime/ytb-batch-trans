@@ -17,6 +17,7 @@ use crate::binaries::binaries_manager::BinariesManager;
 use crate::binaries::binaries_state::BinariesState;
 use crate::commands::*;
 use crate::i18n::I18nManager;
+use crate::logging::file_log;
 use crate::logging::LogStoreState;
 use crate::menu::setup_menu;
 use crate::paths::PathsManager;
@@ -87,6 +88,7 @@ pub fn run() {
       // setup runtime mode detection / path management
       let path_handle = PathsManager::new(handle);
       handle.manage(path_handle.clone());
+      file_log::configure(path_handle.app_dir());
 
       // setup config management
       let config_handle = ConfigHandle::init(handle)?;
@@ -248,12 +250,17 @@ pub fn init_tracing() {
   let sentry_layer = sentry::integrations::tracing::layer().with_filter(
     Targets::new()
       .with_target("tauri_plugin_updater", LevelFilter::OFF)
+      .with_target(file_log::TOOL_OUTPUT_TARGET, LevelFilter::OFF)
       .with_default(tracing_levels()),
   );
+
+  // File layer for the transcribe pipeline (design §8); coexists with fmt/Sentry.
+  let file_layer = file_log::file_log_layer(tracing_levels());
 
   tracing_subscriber::registry()
     .with(fmt_layer)
     .with(sentry_layer)
+    .with(file_layer)
     .init();
 }
 
