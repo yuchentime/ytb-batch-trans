@@ -1,0 +1,295 @@
+version: 1
+updated_at: "2026-09-17"
+runtime_policy:
+  default_order:
+    - "docs/index.md"
+    - "docs/manifest.yaml"
+    - "docs/current/domains/<domain>/index.md"
+  current_first: true
+  history_default: false
+  max_required_current_doc_lines: 350
+
+# code_globs（可选）：该路由背后的源码路径，供 docs/scripts/reconcile_docs.py
+# 判断「代码比文档新」的软漂移信号；结构调整时同步维护。
+routes:
+  onboarding:
+    description: "新代理/新人首次进入仓库所需的最小事实集"
+    token_budget: 16000
+    required:
+      - docs/current/product/overview.md
+      - docs/current/product/glossary.md
+      - docs/current/platform/frontend-runtime.md
+      - docs/current/platform/backend-runtime.md
+      - docs/current/platform/storage.md
+      - docs/current/shared/ipc-conventions.md
+      - docs/current/shared/data-ownership.md
+
+  product:
+    description: "产品范围、用户任务、术语与验收基线"
+    token_budget: 14000
+    required:
+      - docs/current/product/overview.md
+      - docs/current/product/glossary.md
+      - docs/current/product/user-journeys.md
+      - docs/current/product/acceptance.md
+
+  media-queue:
+    description: "入队、元数据抓取、播放列表处理、队列卡片状态机、下载触发与队列操作"
+    token_budget: 26000
+    code_globs:
+      - src/stores/media/**
+      - src/components/media-card/**
+      - src/components/home-view/**
+      - src/tauri/listeners/**
+      - src/helpers/playlistSelection.ts
+      - src/helpers/urlImport.ts
+      - src-tauri/src/commands/media/**
+      - src-tauri/src/scheduling/**
+    required:
+      - docs/current/domains/media-queue/index.md
+      - docs/current/domains/media-queue/flow.md
+      - docs/current/domains/media-queue/api-contract.md
+      - docs/current/domains/media-queue/frontend-behavior.md
+      - docs/current/domains/media-queue/backend-behavior.md
+      - docs/current/domains/media-queue/data-model.md
+      - docs/current/domains/media-queue/error-handling.md
+      - docs/current/domains/media-queue/verification.md
+      - docs/current/shared/ipc-conventions.md
+    optional:
+      - docs/current/domains/download-engine/index.md
+      - docs/current/domains/settings-preferences/data-model.md
+
+  download-engine:
+    description: "yt-dlp 参数构造、进程执行、进度/目标路径解析、取消、诊断与日志"
+    token_budget: 26000
+    code_globs:
+      - src-tauri/src/runners/**
+      - src-tauri/src/parsers/**
+      - src-tauri/src/models/**
+      - src-tauri/src/logging/**
+      - src-tauri/src/diagnostic_rules.json
+      - src/stores/media/progress.ts
+      - src/stores/media/options.ts
+    required:
+      - docs/current/domains/download-engine/index.md
+      - docs/current/domains/download-engine/flow.md
+      - docs/current/domains/download-engine/api-contract.md
+      - docs/current/domains/download-engine/backend-behavior.md
+      - docs/current/domains/download-engine/progress-and-diagnostics.md
+      - docs/current/domains/download-engine/verification.md
+      - docs/current/shared/data-ownership.md
+      - docs/current/rules/backend.rules.md
+    optional:
+      - docs/current/domains/settings-preferences/data-model.md
+      - docs/current/domains/auth-secrets/backend-behavior.md
+
+  toolchain:
+    description: "yt-dlp/ffmpeg 清单签名校验、下载校验、解压安装、版本追踪与安装页"
+    token_budget: 16000
+    code_globs:
+      - src-tauri/src/binaries/**
+      - src-tauri/src/commands/binaries/**
+      - src-tauri/src/commands/app_ready.rs
+      - src/stores/binaries.ts
+      - src/views/full/**
+      - src/components/tool-card/**
+      - scripts/gen-manifest.ts
+      - scripts/sign-manifest.ts
+      - scripts/verify-manifest.ts
+      - scripts/fetch-sources.ts
+    required:
+      - docs/current/domains/toolchain/index.md
+      - docs/current/domains/toolchain/flow.md
+      - docs/current/domains/toolchain/api-contract.md
+      - docs/current/domains/toolchain/backend-behavior.md
+      - docs/current/domains/toolchain/frontend-behavior.md
+      - docs/current/domains/toolchain/verification.md
+    optional:
+      - docs/current/platform/release-and-distribution.md
+
+  settings-preferences:
+    description: "全局设置与本地偏好的 schema、深合并写入、副作用与设置界面"
+    token_budget: 24000
+    code_globs:
+      - src-tauri/src/state/**
+      - src-tauri/src/commands/config/**
+      - src-tauri/src/commands/preferences/**
+      - src-tauri/src/window.rs
+      - src/stores/settings.ts
+      - src/stores/preferences.ts
+      - src/views/app/settings/**
+      - src/views/app/SettingsView.vue
+      - src/views/app/LocationView.vue
+      - src/components/settings/**
+      - src/components/preferences/**
+    required:
+      - docs/current/domains/settings-preferences/index.md
+      - docs/current/domains/settings-preferences/flow.md
+      - docs/current/domains/settings-preferences/data-model.md
+      - docs/current/domains/settings-preferences/api-contract.md
+      - docs/current/domains/settings-preferences/frontend-behavior.md
+      - docs/current/domains/settings-preferences/backend-behavior.md
+      - docs/current/domains/settings-preferences/verification.md
+
+  auth-secrets:
+    description: "stronghold 保险库、系统钥匙串主密钥、Cookie/账号密码/请求头配置"
+    token_budget: 16000
+    code_globs:
+      - src-tauri/src/stronghold/**
+      - src-tauri/src/commands/stronghold/**
+      - src/stores/stronghold.ts
+      - src/components/authentication/**
+      - src/views/app/AuthenticationView.vue
+    required:
+      - docs/current/domains/auth-secrets/index.md
+      - docs/current/domains/auth-secrets/flow.md
+      - docs/current/domains/auth-secrets/api-contract.md
+      - docs/current/domains/auth-secrets/backend-behavior.md
+      - docs/current/domains/auth-secrets/frontend-behavior.md
+      - docs/current/domains/auth-secrets/verification.md
+      - docs/current/rules/security.rules.md
+
+  app-lifecycle:
+    description: "启动流程、窗口、托盘、菜单、全局快捷键、关闭行为、主题/i18n、通知与应用自更新"
+    token_budget: 26000
+    code_globs:
+      - src-tauri/src/lib.rs
+      - src-tauri/src/window.rs
+      - src-tauri/src/tray.rs
+      - src-tauri/src/menu.rs
+      - src-tauri/src/i18n.rs
+      - src-tauri/src/commands/shortcuts.rs
+      - src-tauri/src/commands/notifications.rs
+      - src-tauri/src/commands/updater/**
+      - src/main.ts
+      - src/App.vue
+      - src/layouts/**
+      - src/components/The*.vue
+      - src/composables/useTheme.ts
+      - src/tauri/window.ts
+      - src/locales/**
+      - src-tauri/locales/**
+    required:
+      - docs/current/domains/app-lifecycle/index.md
+      - docs/current/domains/app-lifecycle/flow.md
+      - docs/current/domains/app-lifecycle/api-contract.md
+      - docs/current/domains/app-lifecycle/frontend-behavior.md
+      - docs/current/domains/app-lifecycle/backend-behavior.md
+      - docs/current/domains/app-lifecycle/verification.md
+
+  frontend-runtime:
+    description: "前端运行时：构建、路由、状态、i18n、隔离模式与 CSP"
+    token_budget: 12000
+    code_globs:
+      - vite.config.ts
+      - vite.config.isolation.ts
+      - src/router.ts
+      - src/i18n.ts
+      - src/sentry.ts
+      - src-isolation/**
+    required:
+      - docs/current/platform/frontend-runtime.md
+      - docs/current/rules/frontend.rules.md
+      - docs/current/shared/naming.md
+
+  backend-runtime:
+    description: "后端运行时：Tauri 插件、状态注册、异步模型、capabilities 与安全检查"
+    token_budget: 14000
+    code_globs:
+      - src-tauri/src/main.rs
+      - src-tauri/src/lib.rs
+      - src-tauri/Cargo.toml
+      - src-tauri/capabilities/**
+      - src-tauri/tauri.conf.json
+    required:
+      - docs/current/platform/backend-runtime.md
+      - docs/current/shared/ipc-conventions.md
+      - docs/current/rules/backend.rules.md
+      - docs/current/rules/security.rules.md
+
+  storage-and-env:
+    description: "应用数据目录、便携/商店/snap 形态与环境变量"
+    token_budget: 10000
+    code_globs:
+      - src-tauri/src/paths.rs
+      - src-tauri/src/state/json_handle.rs
+      - src-tauri/src/logging/**
+    required:
+      - docs/current/platform/storage.md
+      - docs/current/platform/env.md
+      - docs/current/shared/data-ownership.md
+
+  observability:
+    description: "日志、诊断码、Sentry 与错误上报"
+    token_budget: 12000
+    code_globs:
+      - src-tauri/src/logging/**
+      - src-tauri/src/diagnostic_rules.json
+      - src/helpers/diagnostics.ts
+      - src/helpers/skippedDiagnostics.ts
+      - src/sentry.ts
+      - src/composables/useDiagnostic.ts
+      - src/components/media-view/DiagnosticCard.vue
+    required:
+      - docs/current/platform/observability.md
+      - docs/current/domains/download-engine/progress-and-diagnostics.md
+      - docs/current/rules/security.rules.md
+
+  build-test-lint:
+    description: "本地与 CI 的构建、静态检查、单测与 E2E"
+    token_budget: 14000
+    code_globs:
+      - package.json
+      - vitest.config.ts
+      - playwright.config.ts
+      - eslint.config.js
+      - tsconfig.json
+      - tests/**
+      - ".github/workflows/**"
+    required:
+      - docs/current/platform/build-test-lint.md
+      - docs/current/shared/testing-strategy.md
+      - docs/current/rules/coding.rules.md
+      - docs/evals/feature-checklist.md
+
+  release-and-distribution:
+    description: "打包目标、CI 发布流水线、官网与签名清单"
+    token_budget: 12000
+    code_globs:
+      - src-tauri/tauri.conf.json
+      - snapcraft.yaml
+      - ".github/workflows/**"
+      - scripts/licenses.ts
+    required:
+      - docs/current/platform/release-and-distribution.md
+      - docs/current/platform/env.md
+      - docs/current/domains/toolchain/api-contract.md
+
+  docs-runtime:
+    description: "文档库自身的结构与维护规则"
+    token_budget: 9000
+    required:
+      - docs/README.md
+      - docs/current/rules/documentation.rules.md
+      - docs/templates/current-doc-template.md
+      - docs/current/shared/naming.md
+
+  debugging:
+    description: "下载失败/进度异常类问题的定位路径"
+    token_budget: 14000
+    code_globs:
+      - src-tauri/src/parsers/**
+      - src-tauri/src/runners/**
+      - src-tauri/src/logging/**
+      - src-tauri/src/diagnostic_rules.json
+      - src-tauri/src/commands/group/**
+      - src/stores/media/diagnostics.ts
+      - src/stores/media/progress.ts
+      - src/helpers/diagnostics.ts
+      - src/helpers/skippedDiagnostics.ts
+    required:
+      - docs/current/domains/download-engine/flow.md
+      - docs/current/domains/download-engine/progress-and-diagnostics.md
+      - docs/current/platform/observability.md
+      - docs/current/domains/media-queue/error-handling.md
+      - docs/current/rules/backend.rules.md

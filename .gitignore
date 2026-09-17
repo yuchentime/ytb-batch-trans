@@ -30,3 +30,7 @@ licenses/*
 # Tests
 test-results/
 coverage/
+
+# Python
+__pycache__/
+*.pyc
