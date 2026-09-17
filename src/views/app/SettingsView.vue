@@ -59,12 +59,16 @@ import { computed, ref, toRaw } from 'vue';
 import { useI18n } from 'vue-i18n';
 import BaseSubNav from '../../components/base/BaseSubNav.vue';
 import { useSettingsStore } from '../../stores/settings';
+import { useStrongholdStore } from '../../stores/stronghold';
 import { useToastStore } from '../../stores/toast';
+import { useTranscriptionStore } from '../../stores/transcription';
 import { useTheme } from '../../composables/useTheme.ts';
 import { Settings } from '../../tauri/types/config.ts';
 import BaseButtonDropdown from '../../components/base/BaseButtonDropdown.vue';
 
 const settingsStore = useSettingsStore();
+const strongholdStore = useStrongholdStore();
+const transcriptionStore = useTranscriptionStore();
 const toastStore = useToastStore();
 const { setTheme } = useTheme();
 const { t } = useI18n();
@@ -73,16 +77,35 @@ const draft = ref<Settings>(structuredClone<Settings>(toRaw(settingsStore.settin
 
 const isSaving = ref(false);
 const isResetting = ref(false);
-const hasChanges = computed(() => JSON.stringify(draft.value) !== JSON.stringify(settingsStore.settings));
+const hasChanges = computed(
+  () => JSON.stringify(draft.value) !== JSON.stringify(settingsStore.settings)
+    || !!strongholdStore.aiApiKeyDraft,
+);
 
 const saveSettings = async () => {
   isSaving.value = true;
-  await settingsStore.patch(draft.value);
-  if (draft.value.appearance.theme) {
-    setTheme(draft.value.appearance.theme);
+  try {
+    await settingsStore.patch(draft.value);
+    if (draft.value.appearance.theme) {
+      setTheme(draft.value.appearance.theme);
+    }
+
+    // The API key is not part of the persisted settings; it is committed here so the
+    // page keeps a single Save action.
+    const apiKey = strongholdStore.aiApiKeyDraft?.trim();
+    if (apiKey) {
+      await strongholdStore.setAiApiKey(apiKey);
+      strongholdStore.aiApiKeyDraft = null;
+      await transcriptionStore.runProbe();
+    }
+
+    toastStore.showToast(t('settings.toasts.saved'), { style: 'success' });
+  } catch (error) {
+    console.error(error);
+    toastStore.showToast(String(error), { style: 'error' });
+  } finally {
+    isSaving.value = false;
   }
-  isSaving.value = false;
-  toastStore.showToast(t('settings.toasts.saved'), { style: 'success' });
 };
 
 const resetSettings = async () => {
@@ -90,6 +113,7 @@ const resetSettings = async () => {
   try {
     const newSettings = await settingsStore.reset();
     draft.value = structuredClone<Settings>(toRaw(newSettings));
+    strongholdStore.aiApiKeyDraft = null;
     if (newSettings.appearance.theme) {
       setTheme(newSettings.appearance.theme);
     }

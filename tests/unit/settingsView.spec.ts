@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { createMemoryHistory, createRouter } from 'vue-router';
-import { defineComponent, nextTick, reactive } from 'vue';
+import { defineComponent, nextTick, reactive, ref } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import SettingsView from '../../src/views/app/SettingsView.vue';
 import SettingsTranscriptionTab from '../../src/views/app/settings/SettingsTranscriptionTab.vue';
@@ -17,6 +17,9 @@ const reset = vi.fn();
 const showToast = vi.fn();
 const setTheme = vi.fn();
 const openInternalPath = vi.fn();
+const aiApiKeyDraft = ref<string | null>(null);
+const setAiApiKey = vi.fn();
+const runProbe = vi.fn();
 
 const settingsState = reactive<Settings>(structuredClone(defaultSettings));
 
@@ -43,6 +46,25 @@ vi.mock('../../src/composables/useTheme', () => ({
 vi.mock('../../src/composables/useOpener', () => ({
   useOpener: () => ({
     openInternalPath,
+  }),
+}));
+
+vi.mock('../../src/stores/stronghold', () => ({
+  useStrongholdStore: () => ({
+    get aiApiKeyDraft() {
+      return aiApiKeyDraft.value;
+    },
+    set aiApiKeyDraft(value: string | null) {
+      aiApiKeyDraft.value = value;
+    },
+    setAiApiKey,
+  }),
+}));
+
+vi.mock('../../src/stores/transcription', () => ({
+  useTranscriptionStore: () => ({
+    probe: null,
+    runProbe,
   }),
 }));
 
@@ -194,5 +216,35 @@ describe('SettingsView', () => {
     expect(reset).toHaveBeenCalledTimes(1);
     expect(showToast).toHaveBeenCalledWith('Reset settings to defaults.', { style: 'success' });
     expect(wrapper.get('input[type="checkbox"]').element).toBeInstanceOf(HTMLInputElement);
+  });
+
+  it('commits a pending API key through the global save action', async () => {
+    patch.mockReset();
+    showToast.mockReset();
+    setAiApiKey.mockReset();
+    runProbe.mockReset();
+    aiApiKeyDraft.value = null;
+    patch.mockImplementation(async () => {});
+    setAiApiKey.mockImplementation(async () => {});
+    runProbe.mockImplementation(async () => {});
+
+    const router = createSettingsRouter();
+    await router.push('/settings/translation');
+    await router.isReady();
+
+    const wrapper = mount(createRoot(), {
+      global: {
+        plugins: [router, i18n],
+      },
+    });
+
+    await nextTick();
+    await wrapper.get('#deepseek-api-key').setValue('sk-test');
+    await wrapper.get('form').trigger('submit');
+    await nextTick();
+
+    expect(setAiApiKey).toHaveBeenCalledWith('sk-test');
+    expect(aiApiKeyDraft.value).toBeNull();
+    expect(runProbe).toHaveBeenCalled();
   });
 });
