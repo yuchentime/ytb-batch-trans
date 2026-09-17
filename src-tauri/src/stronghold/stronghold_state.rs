@@ -81,7 +81,12 @@ impl StrongholdState {
         .lock()
         .map_err(|_| "failed to lock stronghold".to_string())?;
       let sh = guard.as_ref().ok_or_else(|| "vault locked".to_string())?;
-      let store = sh.store();
+      // The IPC commands write into the named `ovd` client; `sh.store()` is the default
+      // client's store and would always look empty (M1 must keep working).
+      let client = sh
+        .get_client(CLIENT)
+        .map_err(|e| format!("get_client failed: {e}"))?;
+      let store = client.store();
 
       let get = |key: &str| -> Result<Option<String>, String> {
         match store.get(key.as_bytes()).map_err(|e| e.to_string())? {
@@ -134,7 +139,10 @@ impl StrongholdState {
       .lock()
       .map_err(|_| "failed to lock stronghold".to_string())?;
     let sh = guard.as_ref().ok_or_else(|| "vault locked".to_string())?;
-    let raw = sh
+    let client = sh
+      .get_client(CLIENT)
+      .map_err(|e| format!("get_client failed: {e}"))?;
+    let raw = client
       .store()
       .get(AI_API_KEY.as_bytes())
       .map_err(|e| e.to_string())?;
@@ -248,5 +256,40 @@ mod tests {
       .expect("utf-8 is valid")
       .expect("non-blank is configured");
     assert_eq!(key.expose(), b"sk-test-DO-NOT-LEAK");
+  }
+
+  #[test]
+  fn secrets_are_read_from_the_ovd_client_store() {
+    let dir = std::env::temp_dir().join(format!("ovd-vault-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let path = dir.join("vault.hold");
+
+    let sh = Stronghold::new(&path, vec![7_u8; 32]).expect("create vault");
+    sh.create_client(CLIENT).expect("create client");
+    sh.write_client(CLIENT).expect("write client");
+    sh.get_client(CLIENT)
+      .expect("load client")
+      .store()
+      .insert(AI_API_KEY.as_bytes().to_vec(), b"sk-test".to_vec(), None)
+      .expect("insert key");
+    sh.get_client(CLIENT)
+      .expect("load client")
+      .store()
+      .insert(b"auth.bearer".to_vec(), b"bearer-token".to_vec(), None)
+      .expect("insert bearer");
+    sh.save().expect("save vault");
+
+    let state = StrongholdState::new(path);
+    *state.inner.lock().unwrap() = Some(sh);
+
+    let key = state
+      .load_ai_api_key()
+      .expect("read the key")
+      .expect("configured");
+    assert_eq!(key.expose(), b"sk-test");
+    let secrets = state.load_auth_secrets().expect("read auth secrets");
+    assert_eq!(secrets.bearer_token.as_deref(), Some("bearer-token"));
+
+    let _ = std::fs::remove_dir_all(&dir);
   }
 }
