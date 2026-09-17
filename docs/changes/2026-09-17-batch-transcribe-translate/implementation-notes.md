@@ -406,3 +406,10 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 - 根因：命令层 `stronghold_set/get/keys` 读写的是命名 client `ovd` 的 store（`sh.get_client(CLIENT).store()`），而 `load_auth_secrets`/`load_ai_api_key` 用的是 `sh.store()`——`iota_stronghold` 里那是**默认 client（index 0）的 store**，与 `ovd` 无关。
 - 修复：两个读取函数改为 `sh.get_client(CLIENT)?.store()`，与命令层一致。
 - 回归测试：新增 `secrets_are_read_from_the_ovd_client_store`（临时 vault 中向 `ovd` client 写入 `ai.apiKey` 与 `auth.bearer`，断言两个读取函数都能拿到）。
+
+## 20. 切块容器跟随源扩展名（2026-09-18）
+
+- 症状：`ffmpegChunkFailed: ... Could not find tag for codec opus in stream #0 ... Error opening output file .work\chunksudio.000.m4a`（exit -22）。
+- 根因：切块 `-c copy` 输出名固定 `.m4a`，而该视频 bestaudio 是 webm/opus，mp4/ipod 容器不支持 opus。
+- 修复：`chunk_file_name(audio, index)` 复用源文件扩展名（无扩展名回退 `m4a`）；whisper 的 JSON 路径按 file_stem 推导，无需改动。
+- 回归测试：`chunk_files_reuse_the_source_container`（webm / m4a / 无扩展名）。
