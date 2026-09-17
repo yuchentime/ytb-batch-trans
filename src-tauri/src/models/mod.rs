@@ -3,6 +3,7 @@ pub mod error;
 pub mod parsed;
 pub mod payloads;
 pub mod progress;
+pub mod transcribe;
 pub mod ytdlp;
 
 pub use download::{DownloadItem, TrackType};

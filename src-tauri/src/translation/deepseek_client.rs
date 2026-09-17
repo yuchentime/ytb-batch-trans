@@ -93,7 +93,7 @@ pub fn parse_retry_after(headers: &reqwest::header::HeaderMap) -> Option<Duratio
   Some(Duration::from_secs(seconds).min(MAX_RETRY_AFTER))
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Usage {
   pub prompt_tokens: u64,
   pub completion_tokens: u64,

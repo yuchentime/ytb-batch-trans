@@ -6,6 +6,7 @@
 //! `chunkBoundaryRisk` (a chunk boundary that looks like a cut word). Neither check drops
 //! or rewrites text: the caller keeps the scene and may rerun.
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// A tail that stops this close to the chunk boundary is treated as a likely cut word
@@ -77,7 +78,7 @@ pub struct ChunkSegments {
 }
 
 /// A segment after the chunk offset shift, with a stable id.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MergedSegment {
   /// `{chunk_index}:{segment_index}` — unique within a plan and stable across reruns.
   pub id: String,

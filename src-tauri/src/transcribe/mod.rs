@@ -4,6 +4,8 @@
 //! allowances with the wiring.
 
 #[allow(dead_code)]
+pub mod artifacts;
+#[allow(dead_code)]
 pub mod chunking;
 #[allow(dead_code)]
 pub mod merge;

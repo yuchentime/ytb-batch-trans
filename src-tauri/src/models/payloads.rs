@@ -90,6 +90,23 @@ impl MediaFatalPayload {
         .unwrap_or(0),
     }
   }
+
+  /// Business failure (process exit, API error, contract violation): surfaced in the UI
+  /// without marking the app itself as broken, and never sent to Sentry.
+  pub fn business(group_id: String, id: String, message: String, details: Option<String>) -> Self {
+    Self {
+      id,
+      group_id,
+      exit_code: None,
+      internal: false,
+      message,
+      details,
+      timestamp: std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0),
+    }
+  }
 }
 
 #[derive(Clone, Debug, Serialize)]

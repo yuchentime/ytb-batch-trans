@@ -26,6 +26,7 @@ use crate::paths::PathsManager;
 use crate::scheduling::concurrency::DynamicSemaphore;
 use crate::scheduling::download_pipeline::{setup_download_dispatcher, DownloadSender};
 use crate::scheduling::fetch_pipeline::{setup_fetch_dispatcher, FetchSender};
+use crate::scheduling::transcribe_pipeline::{setup_transcribe_dispatcher, TranscribeSender};
 use crate::state::config::ConfigHandle;
 use crate::state::preferences::PreferencesHandle;
 use crate::tray::{create_tray, TrayState};
@@ -47,6 +48,14 @@ pub struct DownloadLimiter(pub Arc<DynamicSemaphore>);
 
 #[derive(Clone)]
 pub struct FetchLimiter(pub Arc<DynamicSemaphore>);
+
+/// GPU transcription is serial by design (AC-17): one whisper process at a time.
+#[derive(Clone)]
+pub struct TranscribeLimiter(pub Arc<DynamicSemaphore>);
+
+/// One permit per in-flight translation block (design §5).
+#[derive(Clone)]
+pub struct TranslateLimiter(pub Arc<DynamicSemaphore>);
 
 /// # Panics
 ///
@@ -136,8 +145,18 @@ pub fn run() {
 
       let fetch_dispatcher = setup_fetch_dispatcher(handle, fetch_limiter);
       handle.manage(FetchSender(fetch_dispatcher.sender()));
-      let download_dispatcher = setup_download_dispatcher(handle, download_limiter);
+      let download_dispatcher = setup_download_dispatcher(handle, download_limiter.clone());
       handle.manage(DownloadSender(download_dispatcher.sender()));
+
+      let transcribe_limiter = Arc::new(DynamicSemaphore::new(1));
+      let translate_limiter = Arc::new(DynamicSemaphore::new(
+        cfg_snapshot.translation.concurrency.max(1),
+      ));
+      handle.manage(TranscribeLimiter(transcribe_limiter));
+      handle.manage(TranslateLimiter(translate_limiter));
+
+      let transcribe_dispatcher = setup_transcribe_dispatcher(handle, download_limiter);
+      handle.manage(TranscribeSender(transcribe_dispatcher.sender()));
 
       // setup binaries
       handle.manage(BinariesState::default());
