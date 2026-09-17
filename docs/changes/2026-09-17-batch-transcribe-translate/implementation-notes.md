@@ -399,3 +399,10 @@ CI 盲区：`rust-ci.yml` 只在 push/PR 到 `main` 时触发且跑在 ubuntu；
 - 修复：初始检查改为 `if !*borrow()`；`changed()` 仅在值变为 `false` 时杀进程树并返回 cancelled，冗余 `true` 通知继续等待，sender 被 drop（分组清理）后改为只排空进程输出。
 - 连带：`transcribe_pipeline` 把 `FfmpegError::Cancelled` 从 `probe_duration`/`cut_chunk` 显式映射为 `JobError::Cancelled`（真取消不再记成视频失败/错误码）。
 - 回归测试：新增 3 条 `run_streaming` 单测（已取消不 spawn、运行中正常跑完、翻转为 `false` 杀进程树）。
+
+## 19. stronghold client store 读取修复（2026-09-18）
+
+- 症状：保存 API key 成功（vault.hold 已写入）但重启后 `probe.ok ... has_api_key=false`；翻译阶段也会报无 key；认证 Cookie/密码同理读不到（M1 静默失效）。
+- 根因：命令层 `stronghold_set/get/keys` 读写的是命名 client `ovd` 的 store（`sh.get_client(CLIENT).store()`），而 `load_auth_secrets`/`load_ai_api_key` 用的是 `sh.store()`——`iota_stronghold` 里那是**默认 client（index 0）的 store**，与 `ovd` 无关。
+- 修复：两个读取函数改为 `sh.get_client(CLIENT)?.store()`，与命令层一致。
+- 回归测试：新增 `secrets_are_read_from_the_ovd_client_store`（临时 vault 中向 `ovd` client 写入 `ai.apiKey` 与 `auth.bearer`，断言两个读取函数都能拿到）。
