@@ -138,7 +138,6 @@ const { content: clipboardContent, poll } = useClipboard({
 
 const input = ref<HTMLInputElement | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
-const fileImportImmediateDownload = ref(false);
 
 const inputPlaceholder = computed(() => {
   if (isEnvironmentBlocked.value) {
@@ -169,10 +168,10 @@ async function addClipboardUrlToQueue(urlToRecord: string) {
   }
 
   watchClipboardStore.markSeen(urlToRecord);
-  await mediaStore.dispatchMediaInfoFetch(urlToRecord);
+  await mediaStore.startTranscriptionBatch([urlToRecord]);
 }
 
-function addFromInput(immediateDownload: boolean = false) {
+function addFromInput() {
   if (isEnvironmentBlocked.value) {
     toastStore.showToast(t('setup.gate'), { style: 'error' });
     void router.push({ name: 'setup' });
@@ -180,22 +179,17 @@ function addFromInput(immediateDownload: boolean = false) {
   }
   const urlToSubmit = url.value.length > 0 ? url.value : clipboardContent.value;
   if (!urlToSubmit) return;
-  void processParsedUrls(parseUrlInputText(urlToSubmit), immediateDownload, true);
+  void processParsedUrls(parseUrlInputText(urlToSubmit), true);
   void router.push('/');
   url.value = '';
 }
 
 async function processParsedUrls(
   result: { urls: string[]; skipped: number },
-  immediateDownload: boolean = false,
   fromInput: boolean = false,
 ) {
   if (result.urls.length > 0) {
-    if (immediateDownload) {
-      await mediaStore.addUrlBatchAndDownload(result.urls, false, true);
-    } else {
-      await mediaStore.addUrlBatch(result.urls);
-    }
+    await mediaStore.startTranscriptionBatch(result.urls);
   }
 
   if (!fromInput || result.urls.length > 1) {
@@ -208,12 +202,11 @@ function handleSubmit() {
   addFromInput();
 }
 
-function handleAddClick(event: MouseEvent) {
-  addFromInput(event.shiftKey);
+function handleAddClick() {
+  addFromInput();
 }
 
-function handleImportClick(event: MouseEvent) {
-  fileImportImmediateDownload.value = event.shiftKey;
+function handleImportClick() {
   fileInput.value?.click();
 }
 
@@ -234,12 +227,10 @@ async function handleFileSelection(event: Event) {
 
   try {
     const text = await file.text();
-    await processParsedUrls(parseUrlFileText(text), fileImportImmediateDownload.value);
+    await processParsedUrls(parseUrlFileText(text));
   } catch {
     const toast = getUrlImportReadErrorToast();
     toastStore.showToast(toast.message, { style: toast.style });
-  } finally {
-    fileImportImmediateDownload.value = false;
   }
 }
 

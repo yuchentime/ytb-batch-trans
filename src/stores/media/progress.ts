@@ -57,6 +57,14 @@ export const useMediaProgressStore = defineStore('media-progress', () => {
   function processMediaCompletePayload(payload: MediaProgressCompletePayload) {
     stateStore.setState(payload.id, MediaState.done);
     const group = groupStore.findGroupById(payload.groupId);
+    if (!group) return;
+
+    // Skipped videos never emit `media_add` (the skip check is local, AC-14), so the
+    // pipeline's entry id is unknown here; mark the placeholder leader as done instead.
+    if (!groupStore.findItemInGroup(payload.groupId, payload.id)) {
+      stateStore.setGroupState(payload.groupId, MediaState.done);
+    }
+
     if (group.isCombined) {
       const items = Object.values(group.items);
       const allItemsAreTerminal = !items.some((item) => {

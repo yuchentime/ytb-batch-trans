@@ -1,14 +1,13 @@
-import { mount, RouterLinkStub } from '@vue/test-utils';
+import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { defineComponent, reactive, ref, nextTick } from 'vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TheHeader from '../../src/components/TheHeader.vue';
 import { i18n } from '../../src/i18n';
 import { createDefaultInputFilterSettings } from '../../src/helpers/inputFilters';
+import { useTranscriptionStore } from '../../src/stores/transcription';
 
-const dispatchMediaInfoFetch = vi.fn();
-const addUrlBatch = vi.fn();
-const addUrlBatchAndDownload = vi.fn();
+const startTranscriptionBatch = vi.fn();
 const showToast = vi.fn();
 const toggleClipboard = vi.fn();
 const markSeen = vi.fn();
@@ -27,9 +26,7 @@ const settingsState = reactive({
 
 vi.mock('../../src/stores/media/media', () => ({
   useMediaStore: () => ({
-    dispatchMediaInfoFetch,
-    addUrlBatch,
-    addUrlBatchAndDownload,
+    startTranscriptionBatch,
   }),
 }));
 
@@ -71,9 +68,8 @@ function createBlankView() {
 
 describe('TheHeader', () => {
   beforeEach(() => {
-    dispatchMediaInfoFetch.mockReset();
-    addUrlBatch.mockReset();
-    addUrlBatchAndDownload.mockReset();
+    useTranscriptionStore().setProbe(null);
+    startTranscriptionBatch.mockReset();
     showToast.mockReset();
     toggleClipboard.mockReset();
     markSeen.mockReset();
@@ -146,14 +142,28 @@ describe('TheHeader', () => {
     expect(addButton).toBeTruthy();
     await addButton!.trigger('click');
 
-    expect(addUrlBatch).toHaveBeenCalledWith([
+    expect(startTranscriptionBatch).toHaveBeenCalledWith([
       'https://example.com/a',
       'https://example.com/b',
     ]);
     expect((wrapper.get('#queue-url-input').element as HTMLInputElement).value).toBe('');
   });
 
-  it('supports immediate download when shift-clicking add', async () => {
+  it('blocks adding links while the environment is not ready', async () => {
+    const transcriptionStore = useTranscriptionStore();
+    transcriptionStore.setProbe({
+      whisperFound: false,
+      cudaAvailable: true,
+      model: 'small',
+      modelCached: false,
+      apiKeyConfigured: false,
+      ffmpegPath: 'ffmpeg',
+      ffprobePath: 'ffprobe',
+      logDir: '/logs',
+      logFile: '/logs/transcribe.log',
+      logSizeBytes: 0,
+    });
+
     const router = await createRouterForHeader();
     const wrapper = mount(TheHeader, {
       global: {
@@ -164,9 +174,14 @@ describe('TheHeader', () => {
     await wrapper.get('#queue-url-input').setValue('https://example.com/a');
 
     const addButton = wrapper.findAll('button').find(button => button.text().trim() === 'Add');
-    await addButton!.trigger('click', { shiftKey: true });
+    expect(addButton!.attributes('disabled')).toBeDefined();
 
-    expect(addUrlBatchAndDownload).toHaveBeenCalledWith(['https://example.com/a'], false, true);
+    await wrapper.get('form').trigger('submit');
+
+    expect(startTranscriptionBatch).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalled();
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe('setup');
   });
 
   it('uses clipboard content as the placeholder when it contains a valid url', async () => {

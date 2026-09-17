@@ -107,6 +107,10 @@ const retryGroup = (): void => {
     toastStore.showToast(t('media.card.toasts.retryError'), { style: 'error' });
     return;
   }
+  if (group.transcribeMode) {
+    mediaStore.retryTranscriptionGroup(group.id);
+    return;
+  }
   mediaStore.dispatchMediaInfoFetch(group.url)
     .then(() => {
       toastStore.showToast(t('media.card.toasts.retry'));

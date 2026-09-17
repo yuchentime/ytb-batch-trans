@@ -101,6 +101,10 @@ export const useMediaStore = defineStore('media', () => {
       Object.assign(group, meta);
       group.total = total;
       group.processed = 0;
+      if (group.transcribeMode) {
+        stateStore.setState(item.id, MediaState.fetching);
+        return;
+      }
       if (group.skipPlaylistSelection) {
         void expandPlaylistGroup(groupId, { rows: [] }).catch((error) => {
           console.error(error);
@@ -134,15 +138,21 @@ export const useMediaStore = defineStore('media', () => {
     if (!isFirst) group.processed++;
 
     if (group.processed === total) {
-      finalizePlaylistGroup(group);
-    } else if (group.total === 1 && !hasPlaylistLeader) {
+      if (group.transcribeMode) {
+        splitTranscribedGroup(group);
+      } else {
+        finalizePlaylistGroup(group);
+      }
+    } else if (group.total === 1 && !hasPlaylistLeader && !group.transcribeMode) {
       void notifyGroup(NotificationKind.VideoReady, group);
       resolvePendingReadyGroup(group.id, [group.id]);
     }
 
-    const next = total > 1 && isFirst
-      ? MediaState.fetchingList
-      : MediaState.configure;
+    const next = group.transcribeMode
+      ? MediaState.fetching
+      : total > 1 && isFirst
+        ? MediaState.fetchingList
+        : MediaState.configure;
     stateStore.setState(item.id, next);
   }
 
@@ -190,6 +200,66 @@ export const useMediaStore = defineStore('media', () => {
       groupId,
       entries: selectedEntries,
       overrides: cloneDownloadOverrides(optionsStore.getOverrides(groupId)),
+    });
+  }
+
+  async function startTranscriptionBatch(urls: string[]): Promise<string[]> {
+    const cleaned = urls.map(url => url.trim()).filter(url => url.length > 0);
+    if (cleaned.length === 0) return [];
+
+    const groupIds = await invoke<string[]>('transcribe_start', { urls: cleaned });
+    const groups: Group[] = groupIds.map((groupId, index) => {
+      const itemId = uuidv4();
+      const url = cleaned[index] ?? '';
+      return {
+        id: groupId,
+        url,
+        total: 1,
+        processed: 0,
+        errored: 0,
+        isCombined: false,
+        transcribeMode: true,
+        audioCodecs: [],
+        videoCodecs: [],
+        audioTracks: [],
+        videoTracks: [],
+        formats: [],
+        filesize: 0,
+        items: {
+          [itemId]: {
+            id: itemId,
+            url,
+            audioCodecs: [],
+            formats: [],
+            filesize: 0,
+            isLeader: true,
+          },
+        },
+      };
+    });
+
+    groupStore.prependGroups(groups);
+    for (const group of groups) {
+      stateStore.setGroupState(group.id, MediaState.fetching);
+    }
+    return groupIds;
+  }
+
+  /** A playlist group splits into one card per video once every item has arrived. */
+  function splitTranscribedGroup(group: Group) {
+    const newGroups = groupStore.splitGroup(group);
+    for (const newGroup of newGroups) {
+      newGroup.transcribeMode = true;
+    }
+  }
+
+  function retryTranscriptionGroup(groupId: string) {
+    const group = groupStore.findGroupById(groupId);
+    if (!group?.url) return;
+    const url = group.url;
+    deleteGroup(groupId);
+    void startTranscriptionBatch([url]).catch((error) => {
+      console.error(error);
     });
   }
 
@@ -472,6 +542,8 @@ export const useMediaStore = defineStore('media', () => {
     processMediaAddPayload,
     finalizePlaylistGroup,
     dispatchMediaInfoFetch,
+    startTranscriptionBatch,
+    retryTranscriptionGroup,
     expandPlaylistGroup,
     rejectPendingReadyGroup,
     addAndDownload,

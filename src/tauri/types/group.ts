@@ -35,4 +35,6 @@ export type Group = {
   playlistUploaderId?: string;
   fromShortcut?: boolean;
   skipPlaylistSelection?: boolean;
+  /** True for groups created by `transcribe_start`: cards split per video, no configure step. */
+  transcribeMode?: boolean;
 };

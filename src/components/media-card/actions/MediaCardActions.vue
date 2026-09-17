@@ -11,30 +11,38 @@
         :label="t('media.card.actions.externalUrl')"
         :icon="ArrowTopRightOnSquareIcon"
     />
+    <template v-if="!isTranscribe">
+      <media-card-action-item
+          v-if="canRetry"
+          @click="retryItem"
+          :label="t('media.card.actions.retry')"
+          :icon="ArrowPathIcon"
+      />
+      <media-card-action-item
+         v-else-if="canPause"
+         @click="pauseItem"
+         :label="t('media.card.actions.pause')"
+         :icon="PauseIcon"
+      />
+      <media-card-action-item
+          v-else-if="canResume"
+          @click="resumeItem"
+          :label="t('media.card.actions.resume')"
+          :icon="PlayIcon"
+      />
+      <media-card-action-item
+          v-else
+          @click="downloadItem"
+          :disabled="!canDownload"
+          :label="t('media.card.actions.download')"
+          :icon="ArrowDownTrayIcon"
+      />
+    </template>
     <media-card-action-item
-        v-if="canRetry"
+        v-else-if="canRetry"
         @click="retryItem"
         :label="t('media.card.actions.retry')"
         :icon="ArrowPathIcon"
-    />
-    <media-card-action-item
-       v-else-if="canPause"
-       @click="pauseItem"
-       :label="t('media.card.actions.pause')"
-       :icon="PauseIcon"
-    />
-    <media-card-action-item
-        v-else-if="canResume"
-        @click="resumeItem"
-        :label="t('media.card.actions.resume')"
-        :icon="PlayIcon"
-    />
-    <media-card-action-item
-        v-else
-        @click="downloadItem"
-        :disabled="!canDownload"
-        :label="t('media.card.actions.download')"
-        :icon="ArrowDownTrayIcon"
     />
     <media-card-action-item
         :disabled="!canSetPreferences"
@@ -88,6 +96,8 @@ const { group } = defineProps({
 
 const stateStore = useMediaStateStore();
 const groupState = computed(() => stateStore.getGroupState(group.id));
+
+const isTranscribe = computed(() => group.transcribeMode === true);
 
 const canDownload = computed(() => groupState.value === MediaState.configure);
 const canPause = computed(() => groupState.value === MediaState.downloading || groupState.value === MediaState.downloadingList);
