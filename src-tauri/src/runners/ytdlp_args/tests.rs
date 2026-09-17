@@ -1,13 +1,17 @@
-use super::{build_format_args, build_input_filter_args, build_location_args, build_output_args};
+use super::{
+  build_audio_download_args, build_format_args, build_input_filter_args, build_location_args,
+  build_output_args,
+};
 use crate::models::download::{
-  AudioFormat, AudioPostprocessPreset, DownloadSection, FormatOptions, InputFilterOptions,
-  PartialDownloadOverride, PlaylistMode, TranscodePolicy, VideoContainer, VideoPostprocessMode,
-  VideoPostprocessPreset,
+  AudioFormat, AudioPostprocessPreset, AuthOverrides, DownloadOverrides, DownloadSection,
+  FormatOptions, InputFilterOptions, NetworkOverrides, PartialDownloadOverride, PlaylistMode,
+  TranscodePolicy, VideoContainer, VideoPostprocessMode, VideoPostprocessPreset,
 };
 use crate::models::TrackType;
 use crate::runners::template_context::TemplateContext;
-use crate::state::config_models::OutputSettings;
+use crate::state::config_models::{Config, OutputSettings};
 use crate::state::preferences_models::PathPreferences;
+use crate::stronghold::stronghold_state::AuthSecrets;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -902,4 +906,129 @@ fn location_args_use_track_specific_preferences() {
 
   assert_eq!(args[0], "-o");
   assert!(args[1].contains("/tmp/video"));
+}
+
+#[test]
+fn audio_download_args_are_audio_only_and_merge_overrides() {
+  let overrides = DownloadOverrides {
+    network: Some(NetworkOverrides {
+      enable_proxy: Some(true),
+      proxy: Some("http://127.0.0.1:8080".into()),
+      impersonate: Some("chrome".into()),
+      extractor_args: Some("youtube:player_js_variant=main".into()),
+    }),
+    auth: Some(AuthOverrides {
+      cookie_file: Some("/tmp/cookies.txt".into()),
+      cookie_browser: Some("firefox".into()),
+      username: Some("user".into()),
+      ..Default::default()
+    }),
+    input_filters: Some(InputFilterOptions {
+      playlist_mode: Some(PlaylistMode::SingleVideo),
+      ..Default::default()
+    }),
+    ..Default::default()
+  };
+
+  let args = build_audio_download_args(
+    &Config::default(),
+    Some(&overrides),
+    "/out/.work/audio.%(ext)s",
+    &AuthSecrets::default(),
+  );
+
+  let has_pair = |flag: &str, value: &str| {
+    args
+      .windows(2)
+      .any(|pair| pair[0] == flag && pair[1] == value)
+  };
+  let has_flag = |flag: &str| args.iter().any(|arg| arg == flag);
+
+  assert_eq!(args[0], "-f");
+  assert_eq!(args[1], "ba/best");
+  assert_eq!(args[2], "-o");
+  assert_eq!(args[3], "/out/.work/audio.%(ext)s");
+  assert_eq!(args[4], "--no-playlist");
+  assert!(has_pair("--proxy", "http://127.0.0.1:8080"));
+  assert!(has_pair("--impersonate", "chrome"));
+  assert!(has_pair("--extractor-args", "youtube:player_js_variant=main"));
+  assert!(has_pair("--cookies-from-browser", "firefox"));
+  assert!(has_pair("--cookies", "/tmp/cookies.txt"));
+  assert!(has_pair("--username", "user"));
+
+  for forbidden in [
+    "--merge-output-format",
+    "--remux-video",
+    "--recode-video",
+    "--audio-format",
+    "--write-subs",
+    "--embed-subs",
+    "--sub-langs",
+    "--embed-thumbnail",
+    "--write-thumbnail",
+    "--sponsorblock-remove",
+    "--sponsorblock-mark",
+    "--download-sections",
+    "--min-filesize",
+    "--max-filesize",
+    "--match-filter",
+    "--break-match-filter",
+    "--force-keyframes-at-cuts",
+    "--add-metadata",
+    "--restrict-filenames",
+    "--postprocessor-args",
+  ] {
+    assert!(!has_flag(forbidden), "argv must not contain {forbidden}");
+  }
+}
+
+#[test]
+fn audio_download_args_default_to_playlist_without_credentials() {
+  let args = build_audio_download_args(
+    &Config::default(),
+    None,
+    "/out/.work/audio.%(ext)s",
+    &AuthSecrets::default(),
+  );
+
+  assert_eq!(args[4], "--yes-playlist");
+  assert_eq!(args.len(), 5);
+}
+
+#[test]
+fn audio_download_args_honour_mixed_link_preference() {
+  let mut config = Config::default();
+  config.input.prefer_video_in_mixed_links = true;
+
+  let args = build_audio_download_args(
+    &config,
+    None,
+    "/out/.work/audio.%(ext)s",
+    &AuthSecrets::default(),
+  );
+
+  assert_eq!(args[4], "--no-playlist");
+}
+
+#[test]
+fn audio_download_args_use_config_network_and_auth_settings() {
+  let mut config = Config::default();
+  config.network.enable_proxy = Some(true);
+  config.network.proxy = Some("http://config-proxy:3128".into());
+  config.auth.cookie_file = Some("/tmp/config-cookies.txt".into());
+
+  let args = build_audio_download_args(
+    &config,
+    None,
+    "/out/.work/audio.%(ext)s",
+    &AuthSecrets::default(),
+  );
+
+  let has_pair = |flag: &str, value: &str| {
+    args
+      .windows(2)
+      .any(|pair| pair[0] == flag && pair[1] == value)
+  };
+  assert!(has_pair("--proxy", "http://config-proxy:3128"));
+  assert!(has_pair("--cookies", "/tmp/config-cookies.txt"));
 }

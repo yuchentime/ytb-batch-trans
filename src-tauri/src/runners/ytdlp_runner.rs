@@ -5,7 +5,8 @@ use crate::paths::PathsManager;
 use crate::runners::override_resolver::resolve_with_patch;
 use crate::runners::template_context::TemplateContext;
 use crate::runners::ytdlp_args::{
-  build_format_args, build_input_filter_args, build_location_args, build_output_args,
+  build_auth_args, build_format_args, build_input_filter_args, build_location_args,
+  build_network_args, build_output_args,
 };
 use crate::runners::ytdlp_process::{
   configure_command, kill_platform_process, platform_process_from_child, PlatformProcess,
@@ -90,48 +91,13 @@ impl<'a> YtdlpRunner<'a> {
       &self.cfg.network,
       overrides.and_then(|value| value.network.as_ref()),
     );
-    let proxy_enabled = network.enable_proxy.is_some_and(|enabled| enabled);
-    if proxy_enabled {
-      if let Some(proxy) = network.proxy.as_ref() {
-        self.args.push("--proxy".to_string());
-        self.args.push(proxy.clone());
-      }
-    }
-
-    match network.impersonate.as_str() {
-      "none" => {}
-      "any" => {
-        self.args.push("--impersonate".to_string());
-        self.args.push(String::new());
-      }
-      other => {
-        self.args.push("--impersonate".to_string());
-        self.args.push(other.to_string());
-      }
-    }
-
-    if let Some(extractor_args) = normalize_extractor_args(&network.extractor_args) {
-      self.args.push("--extractor-args".into());
-      self.args.push(extractor_args);
-    }
-
+    self.args.extend(build_network_args(&network));
     self
   }
 
   pub fn with_auth_args(mut self, overrides: Option<&DownloadOverrides>) -> Self {
     let auth_overrides = overrides.and_then(|value| value.auth.as_ref());
     let auth_settings: AuthSettings = resolve_with_patch(&self.cfg.auth, auth_overrides);
-    if auth_settings.cookie_browser != "none" {
-      self.args.extend_from_slice(&[
-        "--cookies-from-browser".into(),
-        auth_settings.cookie_browser,
-      ]);
-    }
-    if let Some(cookie_file) = auth_settings.cookie_file {
-      self
-        .args
-        .extend_from_slice(&["--cookies".into(), cookie_file]);
-    }
 
     let mut effective_auth_secrets = AuthSecrets::default();
     if let Some(sh_state) = self.app.try_state::<StrongholdState>() {
@@ -140,7 +106,9 @@ impl<'a> YtdlpRunner<'a> {
       }
     }
     let effective_auth_secrets = resolve_with_patch(&effective_auth_secrets, auth_overrides);
-    self.apply_auth_secrets(effective_auth_secrets);
+    self
+      .args
+      .extend(build_auth_args(&auth_settings, &effective_auth_secrets));
 
     self
   }
@@ -361,29 +329,6 @@ impl<'a> YtdlpRunner<'a> {
     command.args(&self.args).env("PATH", new_path);
     command
   }
-
-  fn apply_auth_secrets(&mut self, s: AuthSecrets) {
-    if let Some(u) = s.username {
-      self.args.push("--username".into());
-      self.args.push(u);
-    }
-    if let Some(p) = s.password {
-      self.args.push("--password".into());
-      self.args.push(p);
-    }
-    if let Some(vp) = s.video_password {
-      self.args.push("--video-password".into());
-      self.args.push(vp);
-    }
-    if let Some(token) = s.bearer_token {
-      self.args.push("--add-header".into());
-      self.args.push(format!("Authorization:Bearer {token}"));
-    }
-    for h in s.headers {
-      self.args.push("--add-header".into());
-      self.args.push(h);
-    }
-  }
 }
 
 /// Presence-only summary of a yt-dlp invocation, safe to log or send to
@@ -523,20 +468,6 @@ fn build_subtitle_args(
   args.push(resolution.languages.join(","));
 
   Some(args)
-}
-
-fn normalize_extractor_args(value: &str) -> Option<String> {
-  let normalized = value
-    .lines()
-    .map(str::trim)
-    .filter(|line| !line.is_empty())
-    .collect::<Vec<_>>()
-    .join(" ");
-  if normalized.is_empty() {
-    None
-  } else {
-    Some(normalized)
-  }
 }
 
 fn build_sponsorblock_args(settings: &SponsorBlockSettings, precise_cuts: bool) -> Vec<String> {
@@ -863,9 +794,7 @@ fn subtitle_language_bases(languages: &[String]) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-  use super::{
-    build_sponsorblock_args, build_subtitle_args, normalize_extractor_args, summarize_args_for_log,
-  };
+  use super::{build_sponsorblock_args, build_subtitle_args, summarize_args_for_log};
   use crate::models::SubtitleInventory;
   use crate::state::config_models::{SponsorBlockSettings, SubtitleSettings};
 
@@ -1093,30 +1022,6 @@ mod tests {
     .expect("args");
     assert_eq!(args[4], "--write-auto-subs");
     assert_eq!(args[8], "en,nl");
-  }
-
-  #[test]
-  fn extractor_args_empty_returns_none() {
-    assert_eq!(normalize_extractor_args(""), None);
-    assert_eq!(normalize_extractor_args("   "), None);
-  }
-
-  #[test]
-  fn extractor_args_trim_whitespace() {
-    assert_eq!(
-      normalize_extractor_args(" youtube:player_js_variant=main "),
-      Some("youtube:player_js_variant=main".into())
-    );
-  }
-
-  #[test]
-  fn extractor_args_join_non_empty_lines_with_spaces() {
-    assert_eq!(
-      normalize_extractor_args(
-        " youtube:player_js_variant=main \n\n youtube:skip=hls,dash \r\n generic:impersonate"
-      ),
-      Some("youtube:player_js_variant=main youtube:skip=hls,dash generic:impersonate".into())
-    );
   }
 
   #[test]
