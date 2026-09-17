@@ -37,7 +37,7 @@ its status changes.
 - [x] `DESIGN_REVIEW_PASS` is `passed` or `overridden` (see `reviews/design-review.md`)
 - [x] All BLOCKER issues are `closed` with a filled `Verified In`（当前无 BLOCKER）
 - [ ] Remaining WARNING/NOTE issues are either closed or explicitly accepted with a reason（W001/W005/N001 仍开放，见下）
-- [ ] The latest review Result and worklog `评审结论` for the final loop agree（L001 已落地，`评审结论 = pending review`；计划随 L003 集中评审时补 `reviews/L003.md` 并追溯 L001）
+- [ ] The latest review Result and worklog `评审结论` for the final loop agree（L001–L003 均已落地且为 `pending review`；计划补 `reviews/L003.md` 并追溯 L001/L002）
 
 ### 仍开放项的处理约定
 

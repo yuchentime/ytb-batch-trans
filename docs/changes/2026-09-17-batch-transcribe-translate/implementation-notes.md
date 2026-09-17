@@ -84,9 +84,10 @@ whisper --model tiny.en --device cuda --fp16 True  --language en --task transcri
 | 目录 | `<app_dir>/logs/` | `app_dir` 由 `PathsManager::app_dir()` 提供（portable/snap 形态自动跟随，见 `docs/current/platform/storage.md`） |
 | 当前文件 | `transcribe.log` | 追加模式 |
 | 轮转 | `transcribe.log.1` … `.4` | 单文件 5MB，共 5 份 ≤ 25MB；测试用可注入的小阈值 |
-| 写入方式 | `tracing-appender` 滚动 + non-blocking writer | 独立写线程；不在流水线关键路径上做同步 fsync；不阻塞转录 |
-| 接入点 | `src-tauri/src/lib.rs::init_tracing` | 现有 registry 已挂 fmt 层与 Sentry 层，文件层作为第三层叠加；`Targets` 过滤规则保持一致 |
-| 新增依赖 | `tracing-appender`（官方 tracing 生态，MIT/Apache-2.0） | 随 `npm run licenses:rust` 进入许可证清单；`docs/current/platform/release-and-distribution.md` 无需改动（许可证是自动生成的汇总） |
+| 写入方式 | 自研 `SizeRotatingFile`（实现 `Write` + `MakeWriter`） | 同步、无独立线程：每行先在内存拼好，遇 `\n` 单次 `write(2)` 落盘（无 fsync）；不阻塞流水线（与设计的偏差见 design.md → Design Deviations） |
+| 接入点 | `src-tauri/src/lib.rs::init_tracing` | 现有 registry 已挂 fmt 层与 Sentry 层，文件层作为第三层叠加；`Targets` 过滤规则与两者一致，另把 `ovd::tool_output` target 从 Sentry 层排除 |
+| 日志目录 | `file_log::configure(app_dir)`（`PathsManager` 就绪后调用） | 使用惰性 `OnceLock<PathBuf>`：`init_tracing` 早于 `PathsManager`，配置前的少量启动事件只进 fmt/Sentry，不落文件 |
+| 新增依赖 | 无 | 仅启用 `tracing-subscriber` 的 `time`/`local-time` feature（本地 ISO8601 时间戳）；`Cargo.lock` 需在工具链可用后由 cargo 刷新 |
 
 ### 5.2 行格式与关联字段
 
@@ -97,8 +98,9 @@ whisper --model tiny.en --device cuda --fp16 True  --language en --task transcri
 ```
 
 - `stage ∈ fetching|downloadingAudio|transcribing|translating|writing`；不适用时省略该字段。
-- 外部字符串（标题、URL、stderr 摘要、模型响应片段）必须：折叠 `\r`/`\n`/制表符为空格、剔除控制字符、按字段截断（标题 ≤80、响应片段 ≤500、stderr 摘要 ≤2KB）并附 `…` 标记。
-- 事件码必须与 design.md 第 8 节的表**逐字一致**（例如 `whisper.oom` 而不是 `whisperOOM`）；新增事件码先改 design.md 表再改代码。
+- 外部字符串（标题、URL、stderr 摘要、模型响应片段）必须：折叠 `\r`/`\n`/制表符为空格、剔除控制字符、按字段截断（标题 ≤80、响应片段 ≤500、stderr 摘要 ≤2KB）并附 `…` 标记；其余字段有 8KB 硬上限（避免单行日志炸弹，正常 URL 不会触及）。
+- 事件码必须与 design.md 第 8 节的表**逐字一致**（例如 `whisper.oom` 而不是 `whisperOOM`）；新增事件码先改 design.md 表再改代码（L003 已按此新增 `tool.output`）。
+- 实现落点：`logging/events.rs`（事件码常量 + 逐字断言测试）、`logging/file_log.rs`（格式层 `FileLogFormat`、字段访问器、脱敏/截断、`SizeRotatingFile`、`file_log_layer`）；敏感字段名黑名单也在 `file_log.rs` 集中一处（`apikey`/`password`/`bearer`/`cookie`/`token` 等，值替换为 `[redacted]`）。
 
 ### 5.3 脱敏清单（必须集中实现，不得散落）
 
