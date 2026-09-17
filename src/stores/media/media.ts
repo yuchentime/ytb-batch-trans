@@ -7,7 +7,6 @@ import { useMediaDestinationStore } from './destination';
 import { useMediaProgressStore } from './progress';
 import { useMediaOptionsStore } from './options';
 import { DownloadOptions, DownloadOverrides, MediaAddPayload, MediaItem, TrackType } from '../../tauri/types/media';
-import { useMediaSizeStore } from './size.ts';
 import { useMediaDiagnosticsStore } from './diagnostics.ts';
 import { useSettingsStore } from '../settings.ts';
 import { Group } from '../../tauri/types/group.ts';
@@ -38,7 +37,6 @@ export const useMediaStore = defineStore('media', () => {
   const progressStore = useMediaProgressStore();
   const destinationStore = useMediaDestinationStore();
   const optionsStore = useMediaOptionsStore();
-  const sizeStore = useMediaSizeStore();
   const diagnosticsStore = useMediaDiagnosticsStore();
   const settingsStore = useSettingsStore();
   const watchClipboardStore = useWatchClipboardStore();
@@ -446,7 +444,6 @@ export const useMediaStore = defineStore('media', () => {
     for (const itemId of Object.keys(group.items)) {
       stateStore.removeState(itemId);
       progressStore.deleteProgress(itemId);
-      sizeStore.removeSizes(itemId);
       diagnosticsStore.removeDiagnostics(itemId);
     }
     diagnosticsStore.removeDiagnostics(group.id);

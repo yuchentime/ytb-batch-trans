@@ -1,4 +1,3 @@
-use crate::models::download::FormatOptions;
 use crate::models::error::{DiagnosticEvent, DiagnosticLevel};
 use serde::Serialize;
 
@@ -8,15 +7,6 @@ pub struct MediaAddPayload<Item> {
   pub group_id: String,
   pub total: usize,
   pub item: Item,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MediaAddWithFormatPayload<Item> {
-  pub group_id: String,
-  pub total: usize,
-  pub item: Item,
-  pub format: FormatOptions,
 }
 
 #[derive(Clone, Debug, Serialize)]

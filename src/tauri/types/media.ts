@@ -189,10 +189,6 @@ export interface MediaAddPayload {
   item: MediaItem;
 }
 
-export type MediaAddWithFormatPayload = MediaAddPayload & {
-  format: DownloadOptions;
-};
-
 export interface MediaItem {
   id: string;
   url: string;

@@ -1,9 +1,8 @@
-use crate::models::download::{DownloadOverrides, FormatOptions};
-use crate::models::payloads::MediaAddWithFormatPayload;
+use crate::models::download::DownloadOverrides;
 use crate::models::{MediaAddPayload, MediaFatalPayload, PlaylistEntry};
 use crate::runners::ytdlp_info::{run_ytdlp_info_fetch, YtdlpInfoFetchError};
 use crate::{
-  models::{ParsedMedia, ParsedPlaylist},
+  models::ParsedMedia,
   scheduling::concurrency::DynamicSemaphore,
   scheduling::dispatcher::{DispatchEntry, DispatchRequest, GenericDispatcher},
 };
@@ -30,17 +29,6 @@ pub enum FetchRequest {
     entries: Vec<PlaylistEntry>,
     overrides: Box<Option<DownloadOverrides>>,
   },
-  Size {
-    group_id: String,
-    id: String,
-    url: String,
-    format: FormatOptions,
-  },
-  SizePlaylist {
-    group_id: String,
-    playlist: ParsedPlaylist,
-    format: FormatOptions,
-  },
 }
 
 #[derive(Clone)]
@@ -49,7 +37,6 @@ pub struct FetchEntry {
   pub id: String,
   pub url: String,
   pub total: usize,
-  pub format: Option<FormatOptions>,
   pub overrides: Option<DownloadOverrides>,
 }
 
@@ -93,7 +80,6 @@ fn expand_fetch_request(req: FetchRequest) -> Vec<FetchEntry> {
         id,
         url,
         total: 1,
-        format: None,
         overrides: *overrides,
       }]
     }
@@ -114,42 +100,7 @@ fn expand_fetch_request(req: FetchRequest) -> Vec<FetchEntry> {
           id: Uuid::new_v4().to_string(),
           url: e.video_url,
           total,
-          format: None,
           overrides: *overrides.clone(),
-        })
-        .collect()
-    }
-    FetchRequest::Size {
-      group_id,
-      id,
-      url,
-      format,
-    } => {
-      vec![FetchEntry {
-        group_id,
-        id,
-        url,
-        total: 1,
-        format: Some(format),
-        overrides: None,
-      }]
-    }
-    FetchRequest::SizePlaylist {
-      group_id,
-      playlist,
-      format,
-    } => {
-      let total = playlist.entries.len();
-      playlist
-        .entries
-        .into_iter()
-        .map(|e| FetchEntry {
-          group_id: group_id.clone(),
-          id: Uuid::new_v4().to_string(),
-          url: e.video_url,
-          total,
-          format: Some(format.clone()),
-          overrides: None,
         })
         .collect()
     }
@@ -166,7 +117,6 @@ async fn handle_fetch_entry(
     id,
     url,
     total,
-    format,
     overrides,
   } = entry.clone();
 
@@ -175,7 +125,7 @@ async fn handle_fetch_entry(
     id.clone(),
     group_id.clone(),
     &url,
-    format.clone(),
+    None,
     overrides.clone(),
   )
   .await;
@@ -200,22 +150,12 @@ async fn handle_fetch_entry(
 
   match result {
     Some(ParsedMedia::Single(single)) => {
-      if let Some(format) = format {
-        let payload = MediaAddWithFormatPayload {
-          group_id: group_id.clone(),
-          total,
-          item: single,
-          format,
-        };
-        let _ = app.emit("media_size", payload);
-      } else {
-        let payload = MediaAddPayload {
-          group_id: group_id.clone(),
-          total,
-          item: single,
-        };
-        let _ = app.emit("media_add", payload);
-      }
+      let payload = MediaAddPayload {
+        group_id: group_id.clone(),
+        total,
+        item: single,
+      };
+      let _ = app.emit("media_add", payload);
 
       let mut counters = GROUP_COUNTERS.lock().unwrap();
       if let Some(cnt) = counters.get_mut(&group_id) {
@@ -229,20 +169,12 @@ async fn handle_fetch_entry(
       }
     }
     Some(ParsedMedia::Playlist(pl)) => {
-      if let Some(format) = format {
-        let _ = tx.send(DispatchRequest::Pipeline(FetchRequest::SizePlaylist {
-          group_id: group_id.clone(),
-          playlist: pl,
-          format,
-        }));
-      } else {
-        let payload = MediaAddPayload {
-          group_id,
-          total: pl.entries.len(),
-          item: pl,
-        };
-        let _ = app.emit("media_add", payload);
-      }
+      let payload = MediaAddPayload {
+        group_id,
+        total: pl.entries.len(),
+        item: pl,
+      };
+      let _ = app.emit("media_add", payload);
     }
     Some(ParsedMedia::Livestream(_)) => {
       let payload =
