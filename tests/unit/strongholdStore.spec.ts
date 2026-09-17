@@ -59,4 +59,15 @@ describe('stronghold store', () => {
       'stronghold_set',
     ]);
   });
+
+  it('deletes the stored key when the value is null', async () => {
+    const invokeMock = mockBackend(false);
+    const store = useStrongholdStore();
+
+    await store.setAiApiKey(null);
+
+    const setCall = invokeMock.mock.calls.find(call => call[0] === 'stronghold_set');
+    const args = setCall?.[1] as { entries: Record<string, number[] | null> };
+    expect(args.entries['ai.apiKey']).toBeNull();
+  });
 });

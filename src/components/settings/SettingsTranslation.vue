@@ -2,24 +2,42 @@
   <base-fieldset :legend="t('settings.translation.legend')" :label="t('settings.translation.legendLabel')">
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-x-8 gap-y-4">
       <div class="form-control xl:col-span-2">
-        <span class="label-text">{{ t('settings.translation.key.label') }}</span>
-        <div class="flex gap-2 items-center">
-          <input
+        <div class="flex flex-wrap items-end gap-3">
+          <base-secret-input
+              id="deepseek-api-key"
               v-model="apiKey"
-              type="password"
-              autocomplete="new-password"
-              class="input input-bordered grow"
-              :placeholder="t('settings.translation.key.placeholder')"
-              @keydown.enter.prevent="saveApiKey"
+              :label="t('settings.translation.key.label')"
+              password
+              :disabled="isSavingKey"
+              class="grow"
           />
-          <button type="button" class="btn btn-primary" :disabled="isSavingKey || apiKey.length === 0" @click="saveApiKey">
+          <button
+              type="button"
+              class="btn btn-primary"
+              :disabled="isSavingKey || !apiKey"
+              @click="saveApiKey"
+          >
             {{ t('settings.translation.key.save') }}
           </button>
-          <span class="badge" :class="apiKeyConfigured ? 'badge-success' : 'badge-warning'">
+          <button
+              v-if="apiKeyConfigured"
+              type="button"
+              class="btn btn-ghost"
+              :disabled="isSavingKey"
+              @click="clearApiKey"
+          >
+            {{ t('settings.translation.key.clear') }}
+          </button>
+          <span class="badge badge-lg gap-1" :class="apiKeyConfigured ? 'badge-success' : 'badge-warning'">
+            <check-circle-icon v-if="apiKeyConfigured" class="w-4 h-4" />
             {{ apiKeyConfigured ? t('settings.translation.key.configured') : t('settings.translation.key.missing') }}
           </span>
         </div>
-        <span class="label-text-alt">{{ t('settings.translation.key.hint') }}</span>
+        <div v-if="justSaved" class="alert alert-success alert-soft mt-3">
+          <check-circle-icon class="w-5 h-5" />
+          <span>{{ t('settings.translation.key.savedHint') }}</span>
+        </div>
+        <span class="label-text-alt mt-2">{{ t('settings.translation.key.hint') }}</span>
       </div>
 
       <label class="form-control">
@@ -63,9 +81,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { CheckCircleIcon } from '@heroicons/vue/24/solid';
 import BaseFieldset from '../base/BaseFieldset.vue';
+import BaseSecretInput from '../base/BaseSecretInput.vue';
 import { Settings } from '../../tauri/types/config.ts';
 import { useStrongholdStore } from '../../stores/stronghold.ts';
 import { useTranscriptionStore } from '../../stores/transcription.ts';
@@ -78,20 +98,46 @@ const strongholdStore = useStrongholdStore();
 const transcriptionStore = useTranscriptionStore();
 const toastStore = useToastStore();
 
-const apiKey = ref('');
+const apiKey = ref<string | null>(null);
 const isSavingKey = ref(false);
-const apiKeyConfigured = computed(() => transcriptionStore.probe?.apiKeyConfigured === true);
+const justSaved = ref(false);
+const apiKeyConfigured = computed(
+  () => transcriptionStore.probe?.apiKeyConfigured === true || justSaved.value,
+);
+
+// Hide the confirmation once the user starts typing a replacement key.
+watch(apiKey, (value) => {
+  if (value) justSaved.value = false;
+});
 
 async function saveApiKey() {
-  const value = apiKey.value.trim();
-  if (value.length === 0) return;
+  const value = apiKey.value?.trim();
+  if (!value) return;
 
   isSavingKey.value = true;
   try {
     await strongholdStore.setAiApiKey(value);
-    apiKey.value = '';
+    apiKey.value = null;
+    justSaved.value = true;
     toastStore.showToast(t('settings.translation.key.saved'));
     // Refresh the "configured" badge; the probe only reports presence, never the value.
+    await transcriptionStore.runProbe();
+  } catch (error) {
+    console.error(error);
+    toastStore.showToast(String(error), { style: 'error' });
+  } finally {
+    isSavingKey.value = false;
+  }
+}
+
+async function clearApiKey() {
+  if (!window.confirm(t('settings.translation.key.clearConfirm'))) return;
+
+  isSavingKey.value = true;
+  try {
+    await strongholdStore.setAiApiKey(null);
+    justSaved.value = false;
+    toastStore.showToast(t('settings.translation.key.cleared'));
     await transcriptionStore.runProbe();
   } catch (error) {
     console.error(error);

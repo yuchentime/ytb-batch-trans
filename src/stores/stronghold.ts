@@ -94,7 +94,7 @@ export const useStrongholdStore = defineStore('stronghold', () => {
   }
 
   /** Writes the DeepSeek key; it is never read back into the UI (presence shows via the probe). */
-  async function setAiApiKey(value: string): Promise<void> {
+  async function setAiApiKey(value: string | null): Promise<void> {
     // A fresh install has no snapshot yet, so the startup auto-unlock leaves the vault
     // locked; create it here (same as the auth page's "Enable") before writing.
     if (!status.value.unlocked) {
@@ -106,7 +106,7 @@ export const useStrongholdStore = defineStore('stronghold', () => {
 
     const encoder = new TextEncoder();
     await invoke('stronghold_set', {
-      entries: { 'ai.apiKey': Array.from(encoder.encode(value)) },
+      entries: { 'ai.apiKey': value === null ? null : Array.from(encoder.encode(value)) },
     });
   }
 
