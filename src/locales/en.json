@@ -28,6 +28,35 @@
       "readError": "Could not read that file."
     }
   },
+  "setup": {
+    "title": "Environment check",
+    "subtitle": "Transcription needs whisper, ffmpeg and ffprobe. The check runs on start and can be repeated here.",
+    "recheck": "Re-check",
+    "checking": "Checking…",
+    "ok": "Ready",
+    "missing": "Missing",
+    "optional": "Optional",
+    "notChecked": "The environment has not been checked yet.",
+    "allReady": "Everything needed for transcription is available.",
+    "gate": "Transcription environment is not ready — check the environment first.",
+    "fields": {
+      "whisper": "whisper",
+      "cuda": "CUDA",
+      "model": "Whisper model",
+      "ffmpeg": "ffmpeg",
+      "ffprobe": "ffprobe",
+      "apiKey": "DeepSeek API key",
+      "logs": "Log file"
+    },
+    "values": {
+      "notFound": "Not found",
+      "cudaUnavailable": "No CUDA device detected",
+      "modelCached": "{model} cached",
+      "modelNotCached": "{model} (downloads on first use)",
+      "apiKeySet": "Configured",
+      "apiKeyMissing": "Not configured (translation will fail)"
+    }
+  },
   "layout": {
     "header": {
       "placeholder": "Enter a video/playlist link to add to the queue",
@@ -41,7 +70,8 @@
       },
       "nav": {
         "inputFilters": "Filters",
-        "settings": "App Settings"
+        "settings": "App Settings",
+        "setup": "Environment"
       }
     },
     "footer": {

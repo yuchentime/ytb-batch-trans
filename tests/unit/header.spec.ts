@@ -99,6 +99,11 @@ describe('TheHeader', () => {
           component: createBlankView(),
         },
         {
+          path: '/setup',
+          name: 'setup',
+          component: createBlankView(),
+        },
+        {
           path: '/input-filters',
           name: 'input-filters',
           component: createBlankView(),

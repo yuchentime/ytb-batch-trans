@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
+import { invoke } from '@tauri-apps/api/core';
 import { MediaState, useMediaStateStore } from './media/state';
 import { useMediaGroupStore } from './media/group';
 import {
@@ -61,6 +62,24 @@ export const useTranscriptionStore = defineStore('transcription', () => {
   const summaries = ref<BatchSummaryPayload[]>([]);
 
   const latestSummary = computed(() => summaries.value[summaries.value.length - 1] ?? null);
+
+  const isProbeLoaded = computed(() => probe.value !== null);
+
+  // Required before a batch may start: whisper (AC-01 gate) plus the two ffmpeg tools
+  // the chunking stage needs. CUDA and the DeepSeek key are shown but not blocking.
+  const isEnvironmentReady = computed(() => {
+    const result = probe.value;
+    return result !== null && result.whisperFound && !!result.ffmpegPath && !!result.ffprobePath;
+  });
+
+  async function runProbe() {
+    try {
+      probe.value = await invoke<TranscriptionProbe>('transcription_probe');
+    } catch (error) {
+      // Keep the previous result; the gate stays on the last known environment.
+      console.error('transcription_probe failed', error);
+    }
+  }
 
   const totalUsage = computed<TokenUsage>(() => {
     return Object.values(usage.value).reduce<TokenUsage>(
@@ -177,7 +196,10 @@ export const useTranscriptionStore = defineStore('transcription', () => {
     summaries,
     latestSummary,
     totalUsage,
+    isProbeLoaded,
+    isEnvironmentReady,
     setProbe,
+    runProbe,
     processStage,
     processChunkProgress,
     processTranslateProgress,

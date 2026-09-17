@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { invoke } from '@tauri-apps/api/core';
 import { useTranscriptionStore } from '../../src/stores/transcription';
 import { useMediaStateStore, MediaState } from '../../src/stores/media/state';
 import { useMediaGroupStore } from '../../src/stores/media/group';
@@ -85,6 +86,46 @@ describe('transcription store', () => {
     store.processBatchSummary(summary);
     expect(store.latestSummary).toEqual(summary);
     expect(store.summaries).toHaveLength(1);
+  });
+
+  it('runs the environment probe and derives the gate', async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValue({
+      whisperFound: true,
+      cudaAvailable: true,
+      model: 'small',
+      modelCached: true,
+      apiKeyConfigured: true,
+      ffmpegPath: 'ffmpeg',
+      ffprobePath: 'ffprobe',
+      logDir: '/logs',
+      logFile: '/logs/transcribe.log',
+      logSizeBytes: 0,
+    });
+
+    const store = useTranscriptionStore();
+    expect(store.isProbeLoaded).toBe(false);
+    expect(store.isEnvironmentReady).toBe(false);
+
+    await store.runProbe();
+    expect(invokeMock).toHaveBeenCalledWith('transcription_probe');
+    expect(store.isProbeLoaded).toBe(true);
+    expect(store.isEnvironmentReady).toBe(true);
+
+    // whisper missing: the gate closes even though the probe itself succeeded.
+    invokeMock.mockResolvedValueOnce({
+      whisperFound: false,
+      cudaAvailable: true,
+      model: 'small',
+      modelCached: false,
+      apiKeyConfigured: false,
+      logDir: '/logs',
+      logFile: '/logs/transcribe.log',
+      logSizeBytes: 0,
+    });
+    await store.runProbe();
+    expect(store.isProbeLoaded).toBe(true);
+    expect(store.isEnvironmentReady).toBe(false);
   });
 
   it('aggregates usage per group and forgets per-item data on reset', () => {

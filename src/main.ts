@@ -14,12 +14,14 @@ import { binaryHandlers } from '../tests/utils/mocks/binaryHandlers';
 import { updateHandlers } from '../tests/utils/mocks/updateHandlers';
 import { invoke } from '@tauri-apps/api/core';
 import { strongholdHandlers } from '../tests/utils/mocks/strongholdHandlers';
+import { transcriptionHandlers } from '../tests/utils/mocks/transcriptionHandlers';
 import { getDefaultLocale, i18n, resolveLocale } from './i18n';
 import { createSentryPiniaPlugin } from '@sentry/vue';
 import { createSentry } from './sentry.ts';
 import { startWindowWatcher } from './tauri/window.ts';
 import { usePreferencesStore } from './stores/preferences.ts';
 import { useMediaStore } from './stores/media/media.ts';
+import { useTranscriptionStore } from './stores/transcription.ts';
 
 const pinia = createPinia();
 pinia.use(createSentryPiniaPlugin());
@@ -47,6 +49,7 @@ if (__E2E__) {
     ...binaryHandlers,
     ...updateHandlers,
     ...strongholdHandlers,
+    ...transcriptionHandlers,
   });
 }
 
@@ -97,4 +100,9 @@ async function initStores(): Promise<void> {
   } catch (e) {
     console.error(`Unable to load settings: ${e}`);
   }
+
+  // Startup environment probe (design §8: probe on start and on manual recheck); the
+  // home input gate reads this store. Failures keep the last known result.
+  const transcriptionStore = useTranscriptionStore();
+  void transcriptionStore.runProbe();
 }

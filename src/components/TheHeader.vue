@@ -69,6 +69,15 @@
         </li>
       </base-button-dropdown>
     </form>
+    <router-link
+        class="btn btn-subtle"
+        :class="{ 'text-warning': isEnvironmentBlocked }"
+        :title="t('layout.header.nav.setup')"
+        :to="{ name: 'setup' }"
+    >
+      <span class="sr-only">{{ t('layout.header.nav.setup') }}</span>
+      <wrench-screwdriver-icon class="w-6 h-6"/>
+    </router-link>
     <router-link class="btn btn-subtle" :title="t('layout.header.nav.settings')" :to="{ name: 'settings.downloads' }">
       <span class="sr-only">{{ t('layout.header.nav.settings') }}</span>
       <cog8-tooth-icon class="w-6 h-6"/>
@@ -84,6 +93,7 @@ import {
   Cog8ToothIcon,
   DocumentArrowUpIcon,
   FunnelIcon,
+  WrenchScrewdriverIcon,
 } from '@heroicons/vue/24/outline';
 import { FunnelIcon as FunnelIconSolid } from '@heroicons/vue/24/solid';
 import { useMediaStore } from '../stores/media/media';
@@ -104,6 +114,7 @@ import {
   parseUrlInputText,
 } from '../helpers/urlImport.ts';
 import { isInputFiltersActive } from '../helpers/inputFilters.ts';
+import { useTranscriptionStore } from '../stores/transcription';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -112,6 +123,11 @@ const toastStore = useToastStore();
 
 const settingsStore = useSettingsStore();
 const watchClipboardStore = useWatchClipboardStore();
+const transcriptionStore = useTranscriptionStore();
+
+const isEnvironmentBlocked = computed(
+  () => transcriptionStore.isProbeLoaded && !transcriptionStore.isEnvironmentReady,
+);
 
 const doPolling = computed(() => settingsStore.settings.input.autoFillClipboard || watchClipboardStore.isActive);
 const hasActiveInputFilters = computed(() => isInputFiltersActive(settingsStore.settings.inputFilters));
@@ -125,6 +141,9 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const fileImportImmediateDownload = ref(false);
 
 const inputPlaceholder = computed(() => {
+  if (isEnvironmentBlocked.value) {
+    return t('setup.gate');
+  }
   if (watchClipboardStore.isActive) {
     return t('layout.header.watchClipboardPlaceholder');
   }
@@ -139,7 +158,7 @@ const inputPlaceholder = computed(() => {
 const clipboardHasValidUrl = computed(() => isValidUrl(clipboardContent));
 
 const isInputDisabled = computed(() => {
-  return url.value.length === 0 && !clipboardHasValidUrl.value;
+  return isEnvironmentBlocked.value || (url.value.length === 0 && !clipboardHasValidUrl.value);
 });
 
 const url = ref('');
@@ -154,6 +173,11 @@ async function addClipboardUrlToQueue(urlToRecord: string) {
 }
 
 function addFromInput(immediateDownload: boolean = false) {
+  if (isEnvironmentBlocked.value) {
+    toastStore.showToast(t('setup.gate'), { style: 'error' });
+    void router.push({ name: 'setup' });
+    return;
+  }
   const urlToSubmit = url.value.length > 0 ? url.value : clipboardContent.value;
   if (!urlToSubmit) return;
   void processParsedUrls(parseUrlInputText(urlToSubmit), immediateDownload, true);

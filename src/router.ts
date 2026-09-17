@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import HomeView from './views/app/HomeView.vue';
+import SetupView from './views/app/SetupView.vue';
 import MediaView from './views/app/MediaView.vue';
 import SubtitleView from './views/app/SubtitleView.vue';
 import FullLayout from './layouts/FullLayout.vue';
@@ -46,6 +47,12 @@ const routes = [
         name: 'home',
         component: HomeView,
         meta: { index: 0 },
+      },
+      {
+        path: 'setup',
+        name: 'setup',
+        component: SetupView,
+        meta: { index: 1 },
       },
       {
         path: 'settings',

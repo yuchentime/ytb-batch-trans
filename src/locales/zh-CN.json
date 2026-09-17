@@ -28,11 +28,41 @@
       "readError": "无法读取该文件。"
     }
   },
+  "setup": {
+    "title": "环境检查",
+    "subtitle": "转录需要 whisper、ffmpeg 与 ffprobe；启动时会自动检查一次，也可在这里重新检查。",
+    "recheck": "重新检测",
+    "checking": "检测中…",
+    "ok": "就绪",
+    "missing": "缺失",
+    "optional": "可选",
+    "notChecked": "尚未进行环境检查。",
+    "allReady": "转录所需组件均已就绪。",
+    "gate": "转录环境未就绪——请先完成环境检查。",
+    "fields": {
+      "whisper": "whisper",
+      "cuda": "CUDA",
+      "model": "Whisper 模型",
+      "ffmpeg": "ffmpeg",
+      "ffprobe": "ffprobe",
+      "apiKey": "DeepSeek API 密钥",
+      "logs": "日志文件"
+    },
+    "values": {
+      "notFound": "未找到",
+      "cudaUnavailable": "未检测到 CUDA 设备",
+      "modelCached": "{model} 已缓存",
+      "modelNotCached": "{model}（首次使用时下载）",
+      "apiKeySet": "已配置",
+      "apiKeyMissing": "未配置（翻译会失败）"
+    }
+  },
   "layout": {
     "header": {
       "placeholder": "输入视频或播放列表 URL 以添加到队列",
       "nav": {
         "settings": "应用设置",
+        "setup": "环境检查",
         "inputFilters": "筛选条件"
       },
       "watchClipboardPlaceholder": "正在监视剪贴板：复制的链接会添加到队列",
